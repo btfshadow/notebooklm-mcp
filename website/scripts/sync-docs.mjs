@@ -23,6 +23,27 @@ const repoRoot = resolve(websiteRoot, '..');
 const sourceDir = resolve(repoRoot, 'deployment', 'docs');
 const targetDir = resolve(websiteRoot, 'docs');
 
+/**
+ * What each page *is*, for the machines.
+ *
+ * Every page used to carry the same site-wide block saying "this is a piece of
+ * software", which is true of the project and false of the page. An engine
+ * comparing that block to the visible text found 27% overlap and treated the
+ * page as incoherent. A page that declares itself a procedure is the one an
+ * engine reaches for when someone asks how to do something.
+ *
+ *   HowTo    — a procedure the reader follows, steps taken from its H2s
+ *   FAQPage  — problems and their answers, pairs taken from its H3s
+ *   TechArticle (default) — reference and explanation
+ */
+const SCHEMA_TYPE = {
+  '01-INSTALL.md': 'HowTo',
+  '08-DOCKER.md': 'HowTo',
+  '08-WSL-USAGE.md': 'HowTo',
+  '04-N8N-INTEGRATION.md': 'HowTo',
+  '05-TROUBLESHOOTING.md': 'FAQPage',
+};
+
 // Per-file frontmatter. Keys are the filenames in deployment/docs/.
 // For any file not listed here, the sync still copies but without frontmatter.
 const FRONTMATTER = {
@@ -289,6 +310,125 @@ function lastCommitDate(file) {
   return null;
 }
 
+const ORGANIZATION_ID = 'https://roomi-fields.com/#organization';
+const WEBSITE_ID = 'https://notebooklm.roomi-fields.com/#website';
+const SOFTWARE_ID = 'https://notebooklm.roomi-fields.com/#software';
+
+/** Strip markdown decoration from a heading so the schema carries plain text. */
+function plainText(markdown) {
+  return markdown
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/\*\*([^*]*)\*\*/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Headings of one level, in document order, skipping fenced code blocks.
+ * Each carries the H2 it sits under, so a caller can tell a troubleshooting
+ * entry from the navigation that happens to use the same heading level.
+ */
+function headings(body, level) {
+  const marker = '#'.repeat(level);
+  const out = [];
+  let fenced = false;
+  let section = '';
+  body.split('\n').forEach((line, index) => {
+    if (line.startsWith('```')) fenced = !fenced;
+    if (fenced) return;
+    if (line.startsWith('## ')) section = plainText(line.slice(2));
+    if (line.startsWith(`${marker} `)) {
+      out.push({ text: plainText(line.slice(marker.length)), index, section });
+    }
+  });
+  return out;
+}
+
+/**
+ * The prose under a heading, used as an FAQ answer.
+ *
+ * Code blocks are skipped and blank lines are not an end: a troubleshooting
+ * entry opens with the symptom, shows the error, and only then gives the fix,
+ * so stopping at the first paragraph returns the symptom and calls it the
+ * answer. Everything down to the next heading is the answer.
+ */
+function paragraphAfter(body, index) {
+  const lines = body.split('\n');
+  const collected = [];
+  let fenced = false;
+  for (let i = index + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line.startsWith('```')) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    if (line.startsWith('#')) break;
+    if (!line.trim()) continue;
+    collected.push(line.replace(/^[-*]\s+/, '').trim());
+    if (collected.join(' ').length > 600) break;
+  }
+  const text = plainText(collected.join(' '));
+  return text.length >= 30 ? text.slice(0, 500) : null;
+}
+
+/** Headings that organise a page without being a step in it. */
+const NOT_A_STEP =
+  /^(table of contents|contents|next steps|see also|related|overview|summary|further reading|resources|changelog)$/i;
+
+/**
+ * Build the page's own structured data. Returns null when the page has nothing
+ * truthful to say — an empty FAQ is worse than no FAQ.
+ */
+function buildSchema(file, body, meta, modified) {
+  const type = SCHEMA_TYPE[file] ?? 'TechArticle';
+  const name = meta.title ?? plainText(headings(body, 1)[0]?.text ?? '');
+  if (!name) return null;
+
+  const common = {
+    '@context': 'https://schema.org',
+    '@type': type,
+    name,
+    description: meta.description,
+    inLanguage: 'en',
+    datePublished: '2025-11-22',
+    dateModified: modified ? modified.slice(0, 10) : undefined,
+    publisher: { '@id': ORGANIZATION_ID },
+    isPartOf: { '@id': WEBSITE_ID },
+    about: { '@id': SOFTWARE_ID },
+  };
+
+  if (type === 'HowTo') {
+    const steps = headings(body, 2)
+      .map((h) => h.text)
+      .filter((text) => text && !NOT_A_STEP.test(text))
+      .map((text, i) => ({ '@type': 'HowToStep', position: i + 1, name: text }));
+    if (steps.length < 2) return { ...common, '@type': 'TechArticle' };
+    return { ...common, step: steps };
+  }
+
+  if (type === 'FAQPage') {
+    // Only the entries the document itself files under a "Problems" heading.
+    // The rest of its H3s are navigation, and a question that is not a
+    // question is worse structured data than none.
+    const pairs = headings(body, 3)
+      .filter((h) => /problem|issue|error/i.test(h.section))
+      .map((h) => ({ question: h.text, answer: paragraphAfter(body, h.index) }))
+      .filter((p) => p.question && p.answer)
+      .map((p) => ({
+        '@type': 'Question',
+        name: p.question,
+        acceptedAnswer: { '@type': 'Answer', text: p.answer },
+      }));
+    if (pairs.length < 3) return { ...common, '@type': 'TechArticle' };
+    return { ...common, mainEntity: pairs };
+  }
+
+  return common;
+}
+
 function renderFrontmatter(meta) {
   const lines = ['---'];
   for (const [key, value] of Object.entries(meta)) {
@@ -311,6 +451,15 @@ function renderFrontmatter(meta) {
 // CI checkout the directory may not exist yet.
 mkdirSync(targetDir, { recursive: true });
 
+/**
+ * Per-page structured data, keyed by document id.
+ *
+ * It travels in its own file rather than in each page's frontmatter: a JSON
+ * string carried through YAML and MDX comes out the other end corrupted, and
+ * a page whose schema will not parse silently renders none at all.
+ */
+const schemas = {};
+
 // Sync deployment/docs/*.md → website/docs/
 for (const file of readdirSync(sourceDir)) {
   if (!file.endsWith('.md')) continue;
@@ -320,6 +469,10 @@ for (const file of readdirSync(sourceDir)) {
   const meta = { ...(FRONTMATTER[file] ?? {}) };
   const date = lastCommitDate(src);
   if (date) meta.last_update = { date };
+  const schema = buildSchema(file, body, meta, date);
+  // Docusaurus drops the numeric ordering prefix when it builds the document
+  // id, so key the map the way the renderer will ask for it.
+  if (schema) schemas[file.replace(/^\d+-/, '').replace(/\.md$/, '')] = schema;
   const fm = Object.keys(meta).length ? renderFrontmatter(meta) : '';
   writeFileSync(dst, fm + body, 'utf-8');
   console.log(`  ${file}`);
@@ -344,5 +497,12 @@ for (const file of readdirSync(sourceDir)) {
   writeFileSync(changelogDst, fm + body, 'utf-8');
   console.log('  CHANGELOG.md');
 }
+
+writeFileSync(
+  resolve(websiteRoot, 'src', 'page-schemas.json'),
+  `${JSON.stringify(schemas, null, 2)}\n`,
+  'utf-8'
+);
+console.log(`  page-schemas.json (${Object.keys(schemas).length} pages)`);
 
 console.log('Docs sync complete.');

@@ -44,6 +44,11 @@ jobs:
       - name: Build Docusaurus site
         run: npm run build
 
+      # Pages have lost their structured data twice while the build stayed
+      # green. Check what the crawler will actually receive.
+      - name: Check every page carries its own structured data
+        run: node scripts/check-schemas.mjs
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
