@@ -77,9 +77,9 @@ const FRONTMATTER = {
     ],
   },
   '03-API.md': {
-    title: 'NotebookLM REST API reference — 33 HTTP endpoints',
+    title: 'NotebookLM REST API reference — 45 HTTP endpoints',
     description:
-      'Complete HTTP REST API reference for NotebookLM. 33 documented endpoints: /ask, /content, /notebooks, /sources, /health, /setup-auth. Request and response schemas, ready for n8n / Zapier / Make / curl.',
+      'HTTP REST API reference for NotebookLM, 45 endpoints: /ask, /content, /notebooks, /sources, /labels, /share, /health, /setup-auth. Request and response schemas, ready for n8n / Zapier / Make / curl.',
     keywords: [
       'notebooklm rest api',
       'notebooklm http api',

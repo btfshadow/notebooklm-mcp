@@ -77,6 +77,15 @@ Not worth copying from them: the CLI/REPL, keychain integration, the
 batch/pipeline/tag orchestration layer (an agent orchestrates itself), and
 inter-process locks.
 
+### Documentation gaps that cost us visibility
+
+The REST API reference ranks for the queries we care about, and an AI answer
+engine citing it repeats whatever it says. It currently documents **32 of the
+45 endpoints**, and the 13 missing ones are precisely the differentiating
+features: study aids, mind maps, source research, labels, sharing, content
+deletion, `/batch-to-vault`. Writing them up is the highest-value SEO work
+available, ahead of anything to do with metadata.
+
 ### Live behaviours to re-test against the real service
 
 | Question                                              | Why it matters                                                                                                                                                                                 |
