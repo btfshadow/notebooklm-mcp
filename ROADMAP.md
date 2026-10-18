@@ -8,22 +8,89 @@ This document tracks planned features, recent implementations, and future ideas 
 
 ## Backlog
 
-### Medium Priority
+Sequenced into roughly two-week releases. The ordering is by value to an agent
+divided by effort, with one exception: the security items come first regardless.
 
-| Feature                           | Description                                                     |
-| --------------------------------- | --------------------------------------------------------------- |
-| **Scrape: reset to My Notebooks** | Navigate to "My Notebooks" before scraping (not shared view)    |
-| **Scrape after auth**             | Option to auto-scrape notebooks after successful authentication |
-| **Persist scraped notebooks**     | Keep scraped notebooks across re-authentication                 |
-| **Cleanup test notebooks**        | Delete unused notebooks in test accounts (100 limit reached)    |
-| **Edit/Delete notes**             | Complete notes CRUD operations                                  |
+Sources for the imported items: a read of `teng-lin/notebooklm-py` v0.8.5
+(`docs/rpc-reference.md`, `src/notebooklm/rpc/_identifiers.py`) and of
+`jacob-bd/gemini-notebook-mcp-cli` v0.15.6 release notes and docs, 2026-10-18.
+Both are MIT-ish prior art for protocol facts only — we write our own
+implementation and cite the source in the code, per `.claude/CLAUDE.md`.
 
-### Low Priority
+### Now — security
 
-| Feature                   | Description                                                           |
-| ------------------------- | --------------------------------------------------------------------- |
-| **Audio style selection** | Debate, Critique, Brief summary, Deep dive                            |
-| **Export formats**        | PDF/DOCX for reports, PDF/PPTX for presentations, CSV/XLSX for tables |
+| Item                                        | Why                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Confine `add_source` file paths**         | The always-allowed data directory holds `browser_state/state.json`, `accounts.json` and the Chrome profile. A poisoned source can have the agent upload our own Google session into a notebook, which `share_notebook` can then make public. Current check compares strings without a separator, never resolves symlinks, and allows the whole working directory. |
+| **Confine `download_content` output paths** | `output_path` is written verbatim (`src/tools/index.ts`, `src/content/content-manager.ts`). Same class as CVE-2026-61647, and the same hole a competitor patched in their v0.10.1 (GHSA-92q4-9x75-55rf).                                                                                                                                                          |
+| **One shared guard**                        | `resolveVaultDir` already does this correctly for the vault only. Extract it, apply it to all three write paths, and resolve before checking — then write to the resolved path, not the original string.                                                                                                                                                          |
+
+### Next — tools for RPCs we already implement
+
+Zero protocol work: the ids are in `src/rpc/rpc-ids.ts` and nothing exposes them.
+
+| Tool                                        | RPC id                                        |
+| ------------------------------------------- | --------------------------------------------- |
+| Rename a source                             | `RENAME_SOURCE`                               |
+| List stale Drive sources and re-sync them   | `CHECK_SOURCE_FRESHNESS`, `SYNC_DRIVE_SOURCE` |
+| Notebook summary and per-source guide       | `GET_SUMMARY`, `GET_SOURCE_GUIDE`             |
+| List / read / export chat conversations     | `GET_CONVERSATIONS`, `GET_CONVERSATION_TURNS` |
+| Clear chat history                          | `DELETE_CHAT_HISTORY`                         |
+| Revise one slide of a deck                  | `REVISE_SLIDE_DECK`                           |
+| Export an artifact to Google Docs or Sheets | `EXPORT_ARTIFACT`                             |
+
+### Then — new capabilities, highest value first
+
+| Capability                                        | RPC id                         | Notes                                                                                                                                          |
+| ------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ranked passage search across sources              | `ASU5Oe`                       | Retrieval without paying for generation — the single best addition for an agent. Payload `[nb_id, query, null, [1]]`, source filter in slot 4. |
+| Retry a failed artifact, same id                  | `Rytqqe`                       | Today a failed generation is final.                                                                                                            |
+| Quota meter and subscription tier                 | `EylDcb`, `ZwVcOc`             | Needed for long batch runs. Call `EylDcb` only when `SatQRc` reports metering enabled.                                                         |
+| Cancel a running answer or research               | `XgrPMd`, `Zbrupe`             | For research, cancel with the **report id**, not the task id — the task id is a silent no-op.                                                  |
+| Copy a notebook, sources, or artifacts            | `te3DCe`, `R27wvc`, `mKDdke`   | No MCP server exposes these.                                                                                                                   |
+| Independent conversations per notebook            | —                              | The most repeated user request on the competitor's tracker.                                                                                    |
+| Suggested follow-ups, prompts, report formats     | `OcvKNc`, `otmP3b`, `ciyUvf`   | Three trivial calls.                                                                                                                           |
+| Async URL ingestion; append text to a source      | `X1snv`, `QsNTEd`              | ~0.65 s vs ~2 s per source.                                                                                                                    |
+| Chat configuration: goal, persona, length         | `s0tc2d` variant               |                                                                                                                                                |
+| Read and set the account output language          | `ZwVcOc`, `hT54vc`             | Account-global — warn the caller.                                                                                                              |
+| Notebook collections                              | label ids with discriminator 3 |                                                                                                                                                |
+| Synchronous source discovery (~10 results)        | `Es3dTe`                       |                                                                                                                                                |
+| Remove from "recently viewed"                     | `fejl7e`                       | Sometimes answers `[13]`; treat as success.                                                                                                    |
+| Tool groups, to cut the context an agent pays for | —                              | Competitor exposes 53 tools and lets callers disable groups. We expose 40 with no filter.                                                      |
+
+### Correctness to verify against our own code
+
+Each of these cost the other projects a release to learn.
+
+- **Stream end**: the final chunk carries an explicit `isFinalResponse` flag at index 4. "Longest wins" is only a fallback — check what our answer detection actually uses.
+- **Quiz and flashcards**: the `(quantity, difficulty)` pair was transposed in their client. Verify ours against the server echo.
+- **Artifact status**: `1` queued, `2` running, `3` ready, `4` failed, `5` suggested. Two were inverted in their client for months. An artifact missing from a listing is **not** proof of deletion — wait for the timeout.
+- **Deep research**: poll and import with the report id; the task id is not pollable.
+- **Sharing**: a duplicate email succeeds with no effect, and a bulk removal naming one absent target silently ignores **all** of them. Read the state back.
+- **Drive sources**: a deleted Drive file still reports "ready". The Drive status is a separate field.
+- **Media download**: `googlevideo.com` throttles a single full transfer to ~32 KB/s; 8 MB ranges move the same file in about a second.
+
+### Do not implement
+
+Verified dead or no-op upstream — knowing this is worth as much as the rest.
+
+- `Z8UXi` (synchronous CopySources): dead on both frontends.
+- `zVGIdd` (synchronous CopyArtifacts): validates arity, copies nothing, reports success.
+- `gzAChb` (GetQuota): never reports consumption; superseded by `EylDcb`.
+- Batch forms of `WWINqb` and `V5N4be`: rejected, one id per call.
+- Per-turn chat deletion: does not exist; `DELETE_CHAT_HISTORY` clears everything.
+
+### Older items, still open
+
+| Feature                           | Description                                                           |
+| --------------------------------- | --------------------------------------------------------------------- |
+| **Scrape: reset to My Notebooks** | Navigate to "My Notebooks" before scraping (not shared view)          |
+| **Scrape after auth**             | Option to auto-scrape notebooks after successful authentication       |
+| **Persist scraped notebooks**     | Keep scraped notebooks across re-authentication                       |
+| **Cleanup test notebooks**        | Delete unused notebooks in test accounts (100 limit reached)          |
+| **Edit/Delete notes**             | Complete notes CRUD operations                                        |
+| **Audio style selection**         | Debate, Critique, Brief summary, Deep dive                            |
+| **Export formats**                | PDF/DOCX for reports, PDF/PPTX for presentations, CSV/XLSX for tables |
 
 ---
 
