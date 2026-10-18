@@ -28,11 +28,23 @@ const SERVER_VERSION = (
 ).version;
 
 // Extend Express Request to include requestId
+import {
+  assertSafeBind,
+  createOriginGuard,
+  createTokenGuard,
+  isLoopbackHost,
+  resolveAllowedOrigins,
+  resolveApiToken,
+  resolveHttpHost,
+} from './http-security.js';
+
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       requestId: string;
+      /** Set by the token guard: true once a valid token was presented. */
+      authenticatedCaller?: boolean;
     }
   }
 }
@@ -49,16 +61,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// CORS for n8n
-app.use((_req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (_req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  next();
-});
+// Network exposure controls — see src/http-security.ts (GHSA-p69m-c5rf-g2c3).
+// A browser page gets through only if its origin was allow-listed, and every
+// route but /health needs the token once NOTEBOOKLM_API_KEY is set.
+const API_TOKEN = resolveApiToken();
+app.use(createOriginGuard(resolveAllowedOrigins()));
+app.use(createTokenGuard(API_TOKEN));
 
 // Initialize managers
 const authManager = new AuthManager();
@@ -92,6 +100,11 @@ app.get('/', (_req: Request, res: Response) => {
 // Health check
 app.get('/health', async (_req: Request, res: Response) => {
   try {
+    // Open to monitors and container health checks, so an unauthenticated
+    // caller gets liveness only: the full report names the active notebook.
+    if (API_TOKEN && !_req.authenticatedCaller) {
+      return res.json({ status: 'ok', version: SERVER_VERSION });
+    }
     const result = await toolHandlers.handleGetHealth();
     res.json(result);
   } catch (error) {
@@ -1319,7 +1332,7 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
 
 // Start server with startup sequence
 const PORT = Number(process.env.HTTP_PORT) || 3000;
-const HOST = process.env.HTTP_HOST || '0.0.0.0';
+const HOST = resolveHttpHost();
 const VERSION = (
   JSON.parse(
     readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8')
@@ -1477,10 +1490,25 @@ async function startServer(port: number, host: string): Promise<void> {
 
 // Main startup
 (async () => {
+  // Fail before binding rather than after: a wide bind with no token is the
+  // advisory itself, and a warning would scroll past while the server served.
+  try {
+    assertSafeBind(HOST, API_TOKEN);
+  } catch (error) {
+    log.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
+
   await startServer(PORT, HOST);
 
   log.success(`🌐 NotebookLM MCP HTTP Server v${VERSION}`);
   log.success(`   Listening on ${HOST}:${PORT}`);
+  if (API_TOKEN) {
+    log.success('   Token required on every route except /health');
+  } else if (isLoopbackHost(HOST)) {
+    log.info('   Local-only: this machine can reach the API, the network cannot.');
+    log.info('   Set NOTEBOOKLM_API_KEY to require a token as well.');
+  }
 
   // Run startup sequence (account connection, auth verification)
   const startupResult = await startupManager.startup();

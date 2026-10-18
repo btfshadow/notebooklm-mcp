@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: NotebookLM REST API
-  version: 3.2.0
+  version: 4.0.0
   description: |
     Local HTTP REST API for Google NotebookLM. Citation-backed Q&A, Studio
     content generation (audio, video, infographic, report, presentation,
@@ -27,6 +27,12 @@ servers:
         default: localhost
       port:
         default: '3000'
+
+# Required once the server runs with NOTEBOOKLM_API_KEY (mandatory for any
+# bind wider than loopback). /health is the only route that answers without it,
+# and then returns liveness only. See GHSA-p69m-c5rf-g2c3.
+security:
+  - bearerAuth: []
 
 tags:
   - name: Health
@@ -663,6 +669,11 @@ paths:
         '200': { description: Cleaned }
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Value of NOTEBOOKLM_API_KEY, also accepted as the X-API-Key header.
   schemas:
     Health:
       type: object

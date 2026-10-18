@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.0.0] - 2026-10-18
+
+### Security — the HTTP API is no longer open to the network or to any web page
+
+Reported privately on 2026-10-16 through the disclosure channel opened two
+weeks earlier ([GHSA-p69m-c5rf-g2c3](https://github.com/roomi-fields/notebooklm-mcp/security/advisories/GHSA-p69m-c5rf-g2c3)),
+found with [MCP Guard](https://github.com/dshoneys/mcp_guard).
+
+Up to and including 3.2.0 the HTTP wrapper bound `0.0.0.0`, answered every
+origin with `Access-Control-Allow-Origin: *`, and asked for no credentials on
+any of its 45 routes. Two consequences, both real once an account was
+connected: any page the user visited could read their whole library and drive
+every route through `127.0.0.1`, and on a shared network so could anyone else.
+The routes include bulk notebook deletion, so this was not read-only.
+
+The reporter rated it low because their test had no account connected. With an
+account, the same routes serve the library and `/ask`.
+
+Three changes, each closing one leg:
+
+- **`HTTP_HOST` now defaults to `127.0.0.1`.** A bind wider than loopback
+  requires `NOTEBOOKLM_API_KEY`; without it the server refuses to start rather
+  than serving the library to the network.
+- **No wildcard origin, ever.** A request carrying an `Origin` header is
+  refused with `403` unless that origin is listed in
+  `NOTEBOOKLM_ALLOWED_ORIGINS`. Refusing — rather than merely withholding the
+  CORS header — also stops the blind writes a simple form POST could trigger.
+  Direct clients (curl, n8n, the bundled proxy) send no `Origin` and are
+  unaffected.
+- **Bearer token on every route** once `NOTEBOOKLM_API_KEY` is set, compared in
+  constant time, accepted as `Authorization: Bearer` or `X-API-Key`.
+
+`/health` stays reachable without a token so monitors and container health
+checks keep working; unauthenticated it answers liveness only, since the full
+report names the active notebook.
+
+### Breaking
+
+- **Remote access now requires a token.** `HTTP_HOST=0.0.0.0` without
+  `NOTEBOOKLM_API_KEY` exits at startup with instructions.
+- **The Docker image requires `NOTEBOOKLM_API_KEY`.** A container must bind
+  every interface for a published port to work, so the entrypoint refuses to
+  start without one.
+- **Browser clients need `NOTEBOOKLM_ALLOWED_ORIGINS`.** Anything that called
+  the API from a page relied on the wildcard and will now get `403`.
+- Unauthenticated `/health` no longer reports `authenticated`, `notebook_url`
+  or session counts.
+
+Local use through `npm run start:http`, the stdio MCP server, and the bundled
+proxy need no change: the proxy and `doctor:http` forward the token when one is
+set. New guide: [Securing the HTTP API](./deployment/docs/15-SECURITY.md).
+
+---
+
 ## [3.2.0] - 2026-09-03
 
 ### Added — `content_delete`: generated content can finally be removed

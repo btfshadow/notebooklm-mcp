@@ -45,7 +45,7 @@ npm run start:http
 
 ```
 Chrome Profile: C:\Users\...\AppData\Local\notebooklm-mcp\Data\chrome_profile
-Listening on 0.0.0.0:3000
+Listening on 127.0.0.1:3000
 ```
 
 If you see `/opt/google/chrome/chrome` in error messages, the server is running under WSL, not Windows!

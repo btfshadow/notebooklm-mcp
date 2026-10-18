@@ -117,7 +117,11 @@ Close and reopen Claude Desktop. The proxy will connect to your HTTP server.
 | -------------- | ----------------------- | -------------------- |
 | `MCP_HTTP_URL` | `http://localhost:3000` | HTTP server URL      |
 | `HTTP_PORT`    | `3000`                  | Port for HTTP server |
-| `HTTP_HOST`    | `0.0.0.0`               | Host for HTTP server |
+| `HTTP_HOST`    | `127.0.0.1`             | Host for HTTP server |
+
+> **The server is local-only by default.** Binding anything wider than
+> loopback requires `NOTEBOOKLM_API_KEY`, or the server refuses to start.
+> See [Securing the HTTP API](./15-SECURITY.md).
 
 ### Custom Port Example
 

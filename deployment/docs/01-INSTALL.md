@@ -441,7 +441,7 @@ npm run start:http
 **Expected result:**
 
 ```
-✅ [14:30:15] 🌐 HTTP Wrapper listening on 0.0.0.0:3000
+✅ [14:30:15] 🌐 HTTP Wrapper listening on 127.0.0.1:3000
 ℹ️  [14:30:15]    Health check: http://localhost:3000/health
 ℹ️  [14:30:15]    Ask question: POST http://localhost:3000/ask
 ℹ️  [14:30:15]    List notebooks: GET http://localhost:3000/notebooks

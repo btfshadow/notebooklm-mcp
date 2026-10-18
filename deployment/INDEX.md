@@ -249,7 +249,7 @@ cd deployment
 - ✅ Fix persistent authentication Windows
 - ✅ Fix NotebookLM streaming detection
 - ✅ Removal of "EXTREMELY IMPORTANT" system phrase
-- ✅ Server listens on 0.0.0.0 (network accessible)
+- ✅ Server listens on 127.0.0.1 (set HTTP_HOST + NOTEBOOKLM_API_KEY to expose it)
 - ✅ PowerShell automation scripts
 - ✅ Complete deployment documentation
 - ✅ Chrome profile limitation documented

@@ -113,6 +113,9 @@ async function fetchJson(url, options = {}, timeoutMs = 15000) {
       ...options,
       signal: controller.signal,
       headers: {
+        ...(process.env.NOTEBOOKLM_API_KEY
+          ? { Authorization: `Bearer ${process.env.NOTEBOOKLM_API_KEY.trim()}` }
+          : {}),
         'Content-Type': 'application/json',
         ...(options.headers || {}),
       },

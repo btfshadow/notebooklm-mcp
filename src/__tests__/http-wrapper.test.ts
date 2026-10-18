@@ -79,19 +79,6 @@ describe('HTTP Wrapper Notebook Validation', () => {
   });
 });
 
-describe('HTTP Wrapper CORS Headers', () => {
-  it('should define correct CORS headers', () => {
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    };
-
-    expect(corsHeaders['Access-Control-Allow-Origin']).toBe('*');
-    expect(corsHeaders['Access-Control-Allow-Methods']).toContain('POST');
-  });
-});
-
 describe('HTTP Wrapper Request ID', () => {
   it('should generate UUID-like request ID', () => {
     const requestId = randomUUID();

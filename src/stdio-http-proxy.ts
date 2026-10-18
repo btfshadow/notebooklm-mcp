@@ -47,6 +47,9 @@ const SERVER_VERSION = packageJson.version;
 // HTTP server URL (configurable via environment)
 const HTTP_BASE_URL = process.env.MCP_HTTP_URL || 'http://localhost:3000';
 
+// Token for the backend, when it requires one (NOTEBOOKLM_API_KEY there).
+const HTTP_API_TOKEN = process.env.NOTEBOOKLM_API_KEY?.trim() || '';
+
 // Default timeout for HTTP requests (5 minutes)
 const HTTP_REQUEST_TIMEOUT_MS = parseInt(process.env.MCP_HTTP_TIMEOUT || '300000', 10);
 
@@ -68,6 +71,7 @@ async function httpRequest<T>(
     method,
     headers: {
       'Content-Type': 'application/json',
+      ...(HTTP_API_TOKEN ? { Authorization: `Bearer ${HTTP_API_TOKEN}` } : {}),
     },
     signal: controller.signal,
   };
