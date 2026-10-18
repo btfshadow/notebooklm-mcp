@@ -2,7 +2,7 @@
 
 # NotebookLM REST API + MCP server
 
-**Automate Google NotebookLM at scale. 33-endpoint HTTP REST API for n8n / Zapier / Make / curl, plus an MCP server for Claude Code / Cursor / Codex. Citation-backed Q&A, full Studio generation (audio · video · infographic · report · presentation · data table), multi-account rotation with auto-reauth across personal and Google Workspace accounts.**
+**Automate Google NotebookLM at scale. 45-endpoint HTTP REST API for n8n / Zapier / Make / curl, plus an MCP server for Claude Code / Cursor / Codex. Citation-backed Q&A, full Studio generation (audio · video · infographic · report · presentation · data table), multi-account rotation with auto-reauth across personal and Google Workspace accounts.**
 
 > v4.1.0 — **Node 22 is now the floor, and the last four open advisories are gone with it.** The declared floor of Node 18 had quietly become fiction: three production dependencies already required Node 20 or newer, and the test matrix kept passing on 18 without exercising them. Raising it also let the third-party file globber go — its dependency chain carried four advisories with no fix upstream — replaced by Node's built-in search, now actually under test. Builds on **4.0.0**, where the HTTP API stopped being open to the network and to any web page ([GHSA-p69m-c5rf-g2c3](https://github.com/roomi-fields/notebooklm-mcp/security/advisories/GHSA-p69m-c5rf-g2c3)): it binds loopback, refuses unlisted origins, and takes a bearer token — **remote access and Docker require `NOTEBOOKLM_API_KEY`**, see [Securing the HTTP API](./deployment/docs/15-SECURITY.md). Built on a **dual transport** — the internal `batchexecute` RPC API (10-100× faster than scraping, immune to UI rebrands) with the Playwright browser as an automatic fallback. See the [changelog](./CHANGELOG.md).
 
@@ -35,7 +35,7 @@
 
 ## What You Can Build
 
-🔗 **No-code automation pipelines** — The 33-endpoint REST API means NotebookLM becomes a step in n8n, Zapier, Make, or a plain `curl` in cron. No agent, no MCP client, no Node in your stack — just HTTP. This is the half most NotebookLM libraries don't have.
+🔗 **No-code automation pipelines** — The 45-endpoint REST API means NotebookLM becomes a step in n8n, Zapier, Make, or a plain `curl` in cron. No agent, no MCP client, no Node in your stack — just HTTP. This is the half most NotebookLM libraries don't have.
 
 🤖 **Agent tooling** — The same engine over MCP for Claude Code, Cursor and Codex, with a bundled skill that primes the agent on citation formats, the daily-quota-aware batch pattern, and transport selection.
 
@@ -147,7 +147,7 @@ Flashcards and quizzes are generated via `generate_study_aid`; mind maps via `ge
 ### Integration Options
 
 - **MCP Protocol** — Claude Code, Cursor, Codex, any MCP client
-- **Agent Skill** — ships a bundled [`notebooklm` skill](./skills/notebooklm/SKILL.md) (also standalone: [`roomi-fields/notebooklm-skill`](https://github.com/roomi-fields/notebooklm-skill)) that teaches the agent citation formats, the daily-quota-aware batch pattern, and when to use which transport
+- **Agent Skill** — ships a bundled [`notebooklm` skill](./skills/notebooklm/SKILL.md) (also standalone: [`roomi-fields/notebooklm-skill`](https://github.com/roomi-fields/notebooklm-skill)) that teaches the agent citation formats, the batch-to-cache pattern, and when to use which transport
 - **HTTP REST API** — n8n, Zapier, Make.com, custom integrations
 - **Docker** — Isolated deployment with Docker or Docker Compose
 - **[RTFM](https://github.com/roomi-fields/rtfm) retrieval layer** — `/batch-to-vault` writes citation-backed answers as markdown + JSON sidecars (`nblm-answer-v1` schema), indexable by [RTFM](https://github.com/roomi-fields/rtfm) (FTS5 + semantic) for unlimited offline queries. Ideal for academic / SOTA workflows. [Guide](./deployment/docs/14-RTFM-INTEGRATION.md).
@@ -165,7 +165,7 @@ The fastest way to get NotebookLM into Claude Code. Distributed via the [`roomi-
 /plugin install notebooklm@roomi-fields
 ```
 
-That registers the MCP server, runs `npx -y @roomi-fields/notebooklm-mcp@<pinned-version>` automatically (Node ≥ 18 required), and lets you upgrade with two commands when a new release ships: `/plugin marketplace update roomi-fields` then `/reload-plugins`. Then run `npx -y -p @roomi-fields/notebooklm-mcp notebooklm-mcp-setup-auth` once in a terminal to log into Google (a visible Chrome opens). To install RTFM at the same time: `/plugin install rtfm@roomi-fields`.
+That registers the MCP server **and the `notebooklm` agent skill**, runs `npx -y @roomi-fields/notebooklm-mcp@<pinned-version>` automatically (Node ≥ 22 required), and lets you upgrade with two commands when a new release ships: `/plugin marketplace update roomi-fields` then `/reload-plugins`. Then run `npx -y -p @roomi-fields/notebooklm-mcp notebooklm-mcp-setup-auth` once in a terminal to log into Google (a visible Chrome opens). To install RTFM at the same time: `/plugin install rtfm@roomi-fields`.
 
 ### Option 1 — HTTP REST API (n8n, Zapier, Make, curl, any HTTP client)
 
@@ -247,7 +247,7 @@ Full docs site: **<https://roomi-fields.github.io/notebooklm-mcp/>** · [OpenAPI
 | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | [Installation](./deployment/docs/01-INSTALL.md)                                              | Step-by-step setup for HTTP and MCP modes                                                                                         |
 | [Configuration](./deployment/docs/02-CONFIGURATION.md)                                       | Environment variables and security                                                                                                |
-| [REST API reference](./deployment/docs/03-API.md)                                            | Complete HTTP endpoint documentation (33 endpoints)                                                                               |
+| [REST API reference](./deployment/docs/03-API.md)                                            | Complete HTTP endpoint documentation (45 endpoints)                                                                               |
 | [Run 1 000 questions overnight](./deployment/docs/12-BATCH-1000.md)                          | Production batch pattern with auto-reauth and rotation                                                                            |
 | [**RTFM integration — cache as searchable vault**](./deployment/docs/14-RTFM-INTEGRATION.md) | Pipeline pattern: NotebookLM as one-shot ingestion, RTFM as retrieval layer. `/batch-to-vault` endpoint, `nblm-answer-v1` schema. |
 | [n8n integration](./deployment/docs/04-N8N-INTEGRATION.md)                                   | Workflow automation setup                                                                                                         |

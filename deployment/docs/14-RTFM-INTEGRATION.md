@@ -319,5 +319,5 @@ Sidecar `{slug}.json` files conform to this schema. Stable across releases under
 
 - [Run 1 000 questions overnight](/batch-1000-questions) — the larger batch pattern with auto-reauth and rotation
 - [Multi-account rotation](/notebooklm-multi-account) — how quotas and TOTP auto-reauth work
-- [REST API reference](/notebooklm-rest-api) — full endpoint surface (33 endpoints + `/batch-to-vault`)
+- [REST API reference](/notebooklm-rest-api) — full endpoint surface (45 endpoints, `/batch-to-vault` included)
 - [RTFM on GitHub](https://github.com/roomi-fields/rtfm) — the retrieval layer
