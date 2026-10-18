@@ -58,6 +58,35 @@ Zero protocol work: the ids are in `src/rpc/rpc-ids.ts` and nothing exposes them
 | Remove from "recently viewed"                     | `fejl7e`                       | Sometimes answers `[13]`; treat as success.                                                                                                    |
 | Tool groups, to cut the context an agent pays for | —                              | Competitor exposes 53 tools and lets callers disable groups. We expose 40 with no filter.                                                      |
 
+### Onboarding — the conversion half of being found
+
+Being placed where people search is wasted if arriving is hard. The competitor
+installs in three commands (`install`, `login`, `setup`), auto-detects ~12 MCP
+clients, backs up each config before writing it, and ships a `doctor`. We ask
+the user to edit their MCP client config by hand. Of 171 unique visitors in a
+fortnight, 145 saw only the front page.
+
+| Item                                                           | Note                                                                                              |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **A `setup` command that writes the client config**            | Detect the installed clients, back up before writing. The single biggest drop-off we can address. |
+| **Bounded re-auth budget**                                     | Theirs stops after 3 failures / 900 s with a specific diagnostic. Ours retries without a ceiling. |
+| **Login that never replaces a good session with a failed one** | Theirs waits for the real cookie + CSRF for 300 s, and keeps the old session on failure.          |
+| **Optional encryption of the stored session**                  | Ours sits in plain files — the same files the `add_source` hole could exfiltrate.                 |
+
+Not worth copying from them: the CLI/REPL, keychain integration, the
+batch/pipeline/tag orchestration layer (an agent orchestrates itself), and
+inter-process locks.
+
+### Live behaviours to re-test against the real service
+
+| Question                                              | Why it matters                                                                                                                                                                                 |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Is our rate-limit detection obsolete?**             | Google appears to have replaced the fixed daily cap with two compute windows (rolling + weekly) carrying a percentage left and a reset time. Our detector still looks for daily-limit wording. |
+| **Are our cookies device-bound in the RPC path?**     | Replaying cookies outside the browser reportedly fails with status 16 in ~16 s. Our RPC transport is a plain Node fetch with a Cookie header; the browser fallback may be masking this.        |
+| **Do the unused RPC ids in `rpc-ids.ts` still work?** | Several have never been exercised. An id that rotated is cheaper to find now than during an incident.                                                                                          |
+| **Video generation throttle**                         | ~6 in a row, then a 1-2 minute wait; status 8 means Google is throttling for hours, not that we failed.                                                                                        |
+| **Large listings**                                    | Their artifact status listing reached 81 KB and broke agents; they paginate at 20. Check what ours returns on a full notebook.                                                                 |
+
 ### Correctness to verify against our own code
 
 Each of these cost the other projects a release to learn.
