@@ -1,10 +1,8 @@
 # NotebookLM REST API reference — 45 HTTP endpoints
 
-> **Coverage note.** The server exposes 45 endpoints; 32 are documented below.
-> The 13 still missing are the newest ones — study aids, mind maps, source
-> research, labels, sharing, content deletion and `/batch-to-vault`. Until
-> they are written up, the [OpenAPI spec](pathname:///openapi.yaml) is the
-> complete list — it covers all 45, verified against the routes in the code.
+> **Coverage.** All 45 endpoints the server exposes are documented below, and
+> the [OpenAPI 3.1 spec](pathname:///openapi.yaml) carries the same 45 —
+> both checked against the routes declared in the code.
 
 > Complete reference for the NotebookLM HTTP REST API. Citation-backed Q&A,
 > Studio content generation, notebook library, multi-account, sessions.
@@ -64,6 +62,7 @@ Or for network access: `http://<SERVER-IP>:3000`
 | `GET`    | `/notebooks/:id`                | Get notebook details                 |
 | `PUT`    | `/notebooks/:id`                | Update notebook metadata             |
 | `DELETE` | `/notebooks/:id`                | Delete a notebook                    |
+| `DELETE` | `/notebooks/bulk-delete`        | Delete several notebooks in one call |
 | `PUT`    | `/notebooks/:id/activate`       | Activate a notebook (set as default) |
 | `GET`    | `/notebooks/:id/share`          | Read sharing status                  |
 | `PUT`    | `/notebooks/:id/share`          | Toggle the public link               |
@@ -80,27 +79,70 @@ Or for network access: `http://<SERVER-IP>:3000`
 
 ### Content Management
 
-| Method   | Endpoint                          | Description                                   |
-| -------- | --------------------------------- | --------------------------------------------- |
-| `POST`   | `/content/sources`                | Add source/document to notebook               |
-| `DELETE` | `/content/sources/:id`            | Delete source by ID                           |
-| `DELETE` | `/content/sources`                | Delete source by name (query param)           |
-| `POST`   | `/content/generate`               | Generate content (audio, video, report, etc.) |
-| `GET`    | `/content/download`               | Download/export content                       |
-| `POST`   | `/content/notes`                  | Create a note in the notebook                 |
-| `POST`   | `/content/chat-to-note`           | Save chat discussion to a note                |
-| `POST`   | `/content/notes/:title/to-source` | Convert note to source                        |
-| `GET`    | `/content`                        | List sources and generated content            |
-| `DELETE` | `/content/:contentId`             | Delete a generated Studio artifact            |
-| `GET`    | `/notebooks/:id/sources`          | List a notebook's sources with their IDs      |
-| `GET`    | `/notebooks/:id/sources/:sid`     | Read a source's full indexed text             |
-| `POST`   | `/content/notes/list`             | List the notebook's notes                     |
-| `POST`   | `/content/notes/get`              | Read one note, by title or ID                 |
-| `POST`   | `/content/study-aid`              | Generate flashcards or a quiz                 |
-| `POST`   | `/content/mind-map`               | Generate and save a mind map                  |
-| `POST`   | `/content/research`               | Discover web sources (Fast Research)          |
+| Method   | Endpoint                              | Description                                   |
+| -------- | ------------------------------------- | --------------------------------------------- |
+| `POST`   | `/content/sources`                    | Add source/document to notebook               |
+| `DELETE` | `/content/sources/:id`                | Delete source by ID                           |
+| `DELETE` | `/content/sources`                    | Delete source by name (query param)           |
+| `POST`   | `/content/generate`                   | Generate content (audio, video, report, etc.) |
+| `GET`    | `/content/download`                   | Download/export content                       |
+| `POST`   | `/content/notes`                      | Create a note in the notebook                 |
+| `POST`   | `/content/chat-to-note`               | Save chat discussion to a note                |
+| `POST`   | `/content/notes/:noteTitle/to-source` | Convert note to source                        |
+| `GET`    | `/content`                            | List sources and generated content            |
+| `DELETE` | `/content/:contentId`                 | Delete a generated Studio artifact            |
+| `GET`    | `/notebooks/:id/sources`              | List a notebook's sources with their IDs      |
+| `GET`    | `/notebooks/:id/sources/:sourceId`    | Read a source's full indexed text             |
+| `POST`   | `/content/notes/list`                 | List the notebook's notes                     |
+| `POST`   | `/content/notes/get`                  | Read one note, by title or ID                 |
+| `POST`   | `/content/study-aid`                  | Generate flashcards or a quiz                 |
+| `POST`   | `/content/mind-map`                   | Generate and save a mind map                  |
+| `POST`   | `/content/research`                   | Discover web sources (Fast Research)          |
 
 > **Note:** v1.5.0 consolidated content generation into `/content/generate` with all NotebookLM Studio features (audio_overview, video, infographic, report, presentation, data_table).
+
+---
+
+## 0. API Root
+
+### `GET /`
+
+Returns the server's identity, its version and a short, hand-maintained list of entry points.
+
+Unlike `/health`, this route is not exempt from the token guard: when `NOTEBOOKLM_API_KEY` is set,
+an unauthenticated call is rejected rather than answered with a reduced payload.
+
+**Request:**
+
+```bash
+curl http://localhost:3000/
+```
+
+**Success Response (200):**
+
+```json
+{
+  "name": "NotebookLM MCP HTTP Server",
+  "version": "4.0.0",
+  "endpoints": {
+    "health": "GET /health",
+    "ask": "POST /ask",
+    "batch_to_vault": "POST /batch-to-vault",
+    "setup_auth": "POST /setup-auth",
+    "notebooks": "GET /notebooks",
+    "sources": "GET /notebooks/:id/sources",
+    "read_source": "GET /notebooks/:id/sources/:sourceId",
+    "sessions": "GET /sessions"
+  },
+  "docs": "https://roomi-fields.github.io/notebooklm-mcp/"
+}
+```
+
+Note the response shape: this is the only route that does not wrap its payload in
+`{ "success": ..., "data": ... }`. The `endpoints` map is a fixed excerpt of eight routes, not a
+discovery mechanism — the full list is the table at the top of this page and
+[openapi.yaml](pathname:///openapi.yaml). The `version` field is read from `package.json` at
+startup, so it is correct however the server was launched.
 
 ---
 
@@ -274,6 +316,103 @@ $body = @{
 
 Invoke-RestMethod -Uri "http://localhost:3000/ask" -Method Post -Body $body -ContentType "application/json"
 ```
+
+---
+
+## 2b. Batch Questions to Vault
+
+### `POST /batch-to-vault`
+
+Run a list of questions against one notebook and write each answer to disk as a markdown file plus
+a JSON sidecar, ready for indexing by RTFM or any other markdown vault tool. Questions run
+sequentially and reuse the same session, so each answer has the context of the previous ones.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/batch-to-vault \
+  -H "Content-Type: application/json" \
+  -d '{
+    "questions": [
+      "What is the central claim of the book?",
+      "Which objections does the author anticipate?"
+    ],
+    "vault_dir": "/home/user/vault/nblm",
+    "notebook_id": "ifs-therapy",
+    "slug_prefix": "ifs",
+    "sleep_between_ms": 2000
+  }'
+```
+
+**Body Parameters:**
+
+| Parameter          | Type     | Required | Description                                                         |
+| ------------------ | -------- | -------- | ------------------------------------------------------------------- |
+| `questions`        | string[] | ✅ Yes   | Non-empty list of questions, asked in order                         |
+| `vault_dir`        | string   | ✅ Yes   | Output directory, created if missing                                |
+| `notebook_id`      | string   | ❌ No    | Library notebook to query                                           |
+| `notebook_url`     | string   | ❌ No    | Notebook URL, used instead of `notebook_id`                         |
+| `slug_prefix`      | string   | ❌ No    | Prefix for every filename (default: none)                           |
+| `source_format`    | string   | ❌ No    | `none`, `inline`, `footnotes`, `json`, `expanded` (default: `json`) |
+| `sleep_between_ms` | number   | ❌ No    | Pause between questions, in milliseconds (default: `0`)             |
+| `session_id`       | string   | ❌ No    | Reuse an existing session instead of opening a new one              |
+
+Neither `notebook_id` nor `notebook_url` is required: without them the active notebook is used.
+
+**File naming.** Each answer is written as `{slug}.md` and `{slug}.json`, where the slug is a
+three-digit index followed by a slugified question, optionally prefixed — `ifs-001-what-is-the-...`.
+Path separators and `..` sequences are stripped from `slug_prefix`, and it is truncated to 64
+characters, so it can only ever contribute a filename component.
+
+**Containment.** When `NOTEBOOKLM_VAULT_ROOT` is set, `vault_dir` must resolve inside it, and the
+call fails otherwise. When the variable is unset, any writable path is accepted.
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "vault_dir": "/home/user/vault/nblm",
+    "total": 2,
+    "succeeded": 2,
+    "failed": 0,
+    "session_id": "9a580eee",
+    "notebook": {
+      "id": "ifs-therapy",
+      "url": "https://notebooklm.google.com/notebook/00000000-0000-0000-0000-000000000101"
+    },
+    "files": [
+      {
+        "question": "What is the central claim of the book?",
+        "md_path": "/home/user/vault/nblm/ifs-001-what-is-the-central-claim-of-the-book.md",
+        "json_path": "/home/user/vault/nblm/ifs-001-what-is-the-central-claim-of-the-book.json",
+        "success": true,
+        "citations_count": 7
+      }
+    ]
+  }
+}
+```
+
+A question that fails does not abort the batch: it is recorded in `files` with `success: false`, an
+`error` message and empty paths, and the run continues. The `notebook.name` field is only present
+when the answer carried one.
+
+**Error Response (400):**
+
+```json
+{
+  "success": false,
+  "error": "Missing required field: vault_dir (absolute or relative directory path)"
+}
+```
+
+A missing or empty `questions` array returns 400 in the same shape. A run that throws — an
+unwritable directory, for instance — returns the error with status 400 as well, since the handler
+maps any unsuccessful result to 400.
+
+**Response Time:** 30–60 seconds per question, plus `sleep_between_ms` between them.
 
 ---
 
@@ -636,6 +775,67 @@ curl -X DELETE http://localhost:3000/notebooks/parents-numerique
 
 ---
 
+## 8b. Bulk Delete Notebooks
+
+### `DELETE /notebooks/bulk-delete`
+
+Delete several notebooks from NotebookLM itself, by UUID. This removes the notebooks from your
+Google account; it is not the same as `DELETE /notebooks/:id`, which only drops an entry from the
+local library.
+
+Each deletion is verified against a fresh listing afterwards, so a notebook that is still present
+is reported in `failed` rather than falsely claimed as deleted.
+
+**Request:**
+
+```bash
+curl -X DELETE http://localhost:3000/notebooks/bulk-delete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notebook_ids": [
+      "74912e55-34a4-4027-bdcc-8e89badd0efd",
+      "c3ae2b1b-b362-46ae-9dc8-7b658a05955e"
+    ]
+  }'
+```
+
+**Body Parameters:**
+
+| Parameter      | Type     | Required | Description                                                   |
+| -------------- | -------- | -------- | ------------------------------------------------------------- |
+| `notebook_ids` | string[] | ✅ Yes   | Non-empty list of NotebookLM notebook UUIDs                   |
+| `show_browser` | boolean  | ❌ No    | Show Chrome during the fallback browser flow (default: false) |
+
+`show_browser` only has an effect if the RPC path fails and the browser fallback runs; the RPC path
+never opens a window.
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": ["74912e55-34a4-4027-bdcc-8e89badd0efd"],
+    "failed": ["c3ae2b1b-b362-46ae-9dc8-7b658a05955e"],
+    "message": "Deleted 1 notebooks, 1 failed"
+  }
+}
+```
+
+The envelope stays `success: true` even when some or all of the IDs are in `failed` — read the two
+arrays, not the flag.
+
+**Error Response (400):**
+
+```json
+{
+  "success": false,
+  "error": "notebook_ids array is required"
+}
+```
+
+---
+
 ## 9. Activate Notebook
 
 ### `PUT /notebooks/:id/activate`
@@ -682,6 +882,163 @@ curl -X PUT http://localhost:3000/notebooks/shakespeare/activate
 - Updates `last_used` to current date/time
 - Sets `active_notebook_id` in library.json
 - Does not create a session (metadata only)
+
+---
+
+## 9b. Notebook Sharing
+
+### `GET /notebooks/:id/share`
+
+Read a notebook's sharing status: whether the public link is on, the link itself, and the list of
+collaborators.
+
+**Path Parameters:**
+
+| Parameter | Type   | Required | Description              |
+| --------- | ------ | -------- | ------------------------ |
+| `id`      | string | ✅ Yes   | NotebookLM notebook UUID |
+
+**Request:**
+
+```bash
+curl http://localhost:3000/notebooks/74912e55-34a4-4027-bdcc-8e89badd0efd/share
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "isPublic": true,
+    "publicLink": "https://notebooklm.google.com/notebook/74912e55-34a4-4027-bdcc-8e89badd0efd",
+    "collaborators": [{ "email": "colleague@example.com", "name": "A. Colleague" }]
+  }
+}
+```
+
+`publicLink` is absent when the notebook is restricted, and a collaborator's `name` is absent when
+NotebookLM does not return one.
+
+### `PUT /notebooks/:id/share`
+
+Turn the public link on or off. The response is the resulting status, read back after the change,
+in the same shape as the `GET`.
+
+**Request:**
+
+```bash
+curl -X PUT http://localhost:3000/notebooks/74912e55-34a4-4027-bdcc-8e89badd0efd/share \
+  -H "Content-Type: application/json" \
+  -d '{ "public": true }'
+```
+
+**Body Parameters:**
+
+| Parameter | Type    | Required | Description                    |
+| --------- | ------- | -------- | ------------------------------ |
+| `public`  | boolean | ✅ Yes   | `true` enables the public link |
+
+Strictly speaking the handler accepts a call without a body, but only the literal value `true`
+enables the link: any other value, including a missing body, is read as `false` and turns sharing
+off. Always send the field explicitly.
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "isPublic": true,
+    "publicLink": "https://notebooklm.google.com/notebook/74912e55-34a4-4027-bdcc-8e89badd0efd",
+    "collaborators": []
+  }
+}
+```
+
+---
+
+## 9c. Source Labels
+
+Labels group a notebook's sources. Both routes return the notebook's full label list, so the `POST`
+doubles as a read-after-write.
+
+### `GET /notebooks/:id/labels`
+
+List the labels defined on a notebook.
+
+**Path Parameters:**
+
+| Parameter | Type   | Required | Description              |
+| --------- | ------ | -------- | ------------------------ |
+| `id`      | string | ✅ Yes   | NotebookLM notebook UUID |
+
+**Request:**
+
+```bash
+curl http://localhost:3000/notebooks/74912e55-34a4-4027-bdcc-8e89badd0efd/labels
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "labels": [
+      {
+        "id": "7f1c2d90-8b44-4a31-9a6e-5c0d2e8f1a33",
+        "name": "Primary sources",
+        "emoji": "📚",
+        "sourceCount": 12
+      },
+      { "id": "a2b9e114-6d02-4c88-bf31-9e7a4c105d21", "name": "To review", "sourceCount": 0 }
+    ]
+  }
+}
+```
+
+`emoji` is absent when the label has none.
+
+### `POST /notebooks/:id/labels`
+
+Create or delete labels.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/notebooks/74912e55-34a4-4027-bdcc-8e89badd0efd/labels \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "create",
+    "name": "Primary sources",
+    "emoji": "📚"
+  }'
+```
+
+**Body Parameters:**
+
+| Parameter   | Type     | Required | Description                                          |
+| ----------- | -------- | -------- | ---------------------------------------------------- |
+| `action`    | string   | ❌ No    | `list`, `create` or `delete` (default: `list`)       |
+| `name`      | string   | ❌ No    | Label name. Required when `action` is `create`       |
+| `emoji`     | string   | ❌ No    | Emoji shown beside the label (default: none)         |
+| `label_ids` | string[] | ❌ No    | Labels to remove. Required when `action` is `delete` |
+
+**Success Response (200):** same shape as the `GET` — the label list after the change.
+
+**Error Response (200 with `success: false`):**
+
+```json
+{
+  "success": false,
+  "error": "name required to create a label"
+}
+```
+
+A `delete` without `label_ids` returns `label_ids required to delete` in the same form. Note the
+status code: these validation failures are carried in the body, not in the HTTP status, and the
+route only returns 500 when the underlying call throws.
 
 ---
 
@@ -1315,6 +1672,203 @@ curl -X POST http://localhost:3000/content/generate \
 
 ---
 
+## 16b. Generate a Study Aid
+
+### `POST /content/study-aid`
+
+Generate flashcards or a quiz from every source in the notebook. This is a Studio artifact type the
+browser-driven `/content/generate` never exposed, so it is available over the internal API only.
+
+The call blocks until generation finishes, polling every five seconds for up to fifteen minutes.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/content/study-aid \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notebook_id": "74912e55-34a4-4027-bdcc-8e89badd0efd",
+    "kind": "flashcards",
+    "focus": "Concentrate on the terminology introduced in chapter 3"
+  }'
+```
+
+**Body Parameters:**
+
+| Parameter      | Type   | Required | Description                                                         |
+| -------------- | ------ | -------- | ------------------------------------------------------------------- |
+| `kind`         | string | ✅ Yes   | `flashcards` or `quiz`                                              |
+| `notebook_url` | string | ❌ No    | Notebook URL                                                        |
+| `notebook_id`  | string | ❌ No    | Notebook UUID, used instead of `notebook_url`                       |
+| `focus`        | string | ❌ No    | Free-text steer for the generator (default: none)                   |
+| `language`     | string | ❌ No    | Output language (default: the server's configured content language) |
+
+With neither `notebook_url` nor `notebook_id`, the active notebook is used. An unrecognised
+`language` is refused rather than silently replaced.
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "completed",
+    "title": "Flashcards: Nonviolent Communication",
+    "artifactId": "3f0b9c21-7a4e-4d55-9f12-6c8e0a1b2d34"
+  }
+}
+```
+
+**Error Response (200 with `success: false`):**
+
+```json
+{
+  "success": false,
+  "data": { "status": "timeout", "artifactId": "3f0b9c21-7a4e-4d55-9f12-6c8e0a1b2d34" },
+  "error": "Generation timeout"
+}
+```
+
+The payload is still present when generation does not complete, so you can retrieve the artifact
+later with `GET /content`. Other failures — `kind must be 'flashcards' or 'quiz'`, `No notebook
+specified`, `notebook has no sources` — come back the same way, with no `data`.
+
+Generation requires a notebook you own: NotebookLM refuses Studio creation on a notebook merely
+shared with you.
+
+**Response Time:** 1–5 minutes.
+
+---
+
+## 16c. Generate a Mind Map
+
+### `POST /content/mind-map`
+
+Generate a mind map from the notebook's sources and save it to the notebook. The response carries
+the map itself as a JSON string, so you can render it without a second call.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/content/mind-map \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notebook_id": "74912e55-34a4-4027-bdcc-8e89badd0efd",
+    "title": "NVC overview",
+    "focus": "Organise around the four steps"
+  }'
+```
+
+**Body Parameters:**
+
+| Parameter      | Type   | Required | Description                                                         |
+| -------------- | ------ | -------- | ------------------------------------------------------------------- |
+| `notebook_url` | string | ❌ No    | Notebook URL                                                        |
+| `notebook_id`  | string | ❌ No    | Notebook UUID, used instead of `notebook_url`                       |
+| `title`        | string | ❌ No    | Title of the saved map (default: `Mind Map`)                        |
+| `focus`        | string | ❌ No    | Free-text steer for the generator (default: none)                   |
+| `language`     | string | ❌ No    | Output language (default: the server's configured content language) |
+
+With neither `notebook_url` nor `notebook_id`, the active notebook is used.
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "mindMapId": "5d8a1c33-0e67-4b92-8c41-72f5b0a9e118",
+    "title": "NVC overview",
+    "json": "{\"nodes\":[{\"id\":\"root\",\"label\":\"Nonviolent Communication\"}]}"
+  }
+}
+```
+
+`json` is the raw mind-map document as returned by NotebookLM, kept as a string; its internal
+structure is not normalised by this server, so treat the example above as illustrative only.
+`mindMapId` is `null` when the map was generated but the save step returned no identifier.
+
+**Error Response (200 with `success: false`):**
+
+```json
+{
+  "success": false,
+  "error": "notebook has no sources"
+}
+```
+
+As with the study aid, the notebook must be one you own.
+
+---
+
+## 16d. Research Web Sources
+
+### `POST /content/research`
+
+Run NotebookLM's Fast Research against the open web and return the sources it finds, optionally
+importing them into the notebook in the same call.
+
+The call starts the research task and then polls every five seconds for up to two minutes. If
+nothing has been found by then it returns an empty list rather than an error.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/content/research \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notebook_id": "74912e55-34a4-4027-bdcc-8e89badd0efd",
+    "query": "empirical studies on nonviolent communication in schools",
+    "import": false
+  }'
+```
+
+**Body Parameters:**
+
+| Parameter      | Type    | Required | Description                                                 |
+| -------------- | ------- | -------- | ----------------------------------------------------------- |
+| `query`        | string  | ✅ Yes   | What to research                                            |
+| `notebook_url` | string  | ❌ No    | Notebook URL                                                |
+| `notebook_id`  | string  | ❌ No    | Notebook UUID, used instead of `notebook_url`               |
+| `import`       | boolean | ❌ No    | Add the discovered sources to the notebook (default: false) |
+
+With neither `notebook_url` nor `notebook_id`, the active notebook is used.
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "taskId": "task-9f3c1a7e",
+    "imported": 0,
+    "sources": [
+      {
+        "url": "https://example.org/nvc-in-schools",
+        "title": "Nonviolent Communication in Schools: a review",
+        "description": "A 2023 review of classroom interventions."
+      }
+    ]
+  }
+}
+```
+
+`description` is absent when the result carried none. `imported` is the number of sources actually
+added, and stays `0` unless `import` was `true`. `taskId` is `null` when the poll found no task.
+
+**Error Response (200 with `success: false`):**
+
+```json
+{
+  "success": false,
+  "error": "query is required"
+}
+```
+
+**Response Time:** up to 2 minutes.
+
+---
+
 ## 17b. Download/Export Content
 
 ### `GET /content/download`
@@ -1456,6 +2010,63 @@ curl "http://localhost:3000/content?notebook_url=https://notebooklm.google.com/n
 
 ---
 
+## 18b. Delete Generated Content
+
+### `DELETE /content/:contentId`
+
+Delete one generated Studio artifact — a report, an audio overview, a mind map, a study aid — by its
+ID. The IDs come from `GET /content`.
+
+**Path Parameters:**
+
+| Parameter   | Type   | Required | Description                  |
+| ----------- | ------ | -------- | ---------------------------- |
+| `contentId` | string | ✅ Yes   | ID of the artifact to delete |
+
+**Query Parameters:**
+
+| Parameter      | Type   | Required | Description                                   |
+| -------------- | ------ | -------- | --------------------------------------------- |
+| `notebook_url` | string | ❌ No    | Notebook URL                                  |
+| `notebook_id`  | string | ❌ No    | Notebook UUID, used instead of `notebook_url` |
+
+The notebook is passed in the query string, not in a body. With neither parameter, the active
+notebook is used.
+
+**Request:**
+
+```bash
+curl -X DELETE \
+  "http://localhost:3000/content/3f0b9c21-7a4e-4d55-9f12-6c8e0a1b2d34?notebook_id=74912e55-34a4-4027-bdcc-8e89badd0efd"
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notebookId": "74912e55-34a4-4027-bdcc-8e89badd0efd",
+    "contentId": "3f0b9c21-7a4e-4d55-9f12-6c8e0a1b2d34",
+    "deleted": true
+  }
+}
+```
+
+`deleted` is always `true` on a successful call: the deletion is not verified against a fresh
+listing afterwards, unlike `DELETE /notebooks/bulk-delete`.
+
+**Error Response (200 with `success: false`):**
+
+```json
+{
+  "success": false,
+  "error": "No notebook specified (notebook_url or notebook_id)"
+}
+```
+
+---
+
 ## 19. Download/Export Content
 
 ### `GET /content/download`
@@ -1568,6 +2179,116 @@ curl -X POST http://localhost:3000/content/notes \
 - Build a structured outline from notebook content
 
 ---
+
+## 20b. List Notes
+
+### `POST /content/notes/list`
+
+List the notes saved in the notebook's Studio panel, with their titles and the short detail line
+NotebookLM shows beneath each one.
+
+This route is browser-driven: it opens or reuses a session, scrolls the Studio panel to force the
+older notes to load, and reads them from the page. Expect seconds, not milliseconds, and expect it
+to be sensitive to NotebookLM interface changes.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/content/notes/list \
+  -H "Content-Type: application/json" \
+  -d '{
+    "notebook_url": "https://notebooklm.google.com/notebook/74912e55-34a4-4027-bdcc-8e89badd0efd"
+  }'
+```
+
+**Body Parameters:**
+
+| Parameter      | Type   | Required | Description               |
+| -------------- | ------ | -------- | ------------------------- |
+| `notebook_url` | string | ❌ No    | Target notebook URL       |
+| `session_id`   | string | ❌ No    | Reuse an existing session |
+
+Without `notebook_url` the active notebook is used, then the configured default notebook. Note that
+this route takes a URL only — unlike the Studio routes above, it has no `notebook_id` parameter.
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "notes": [
+      {
+        "id": "note-4b21",
+        "title": "Key Findings Summary",
+        "details": "3 sources · 12 Jan"
+      },
+      { "title": "Open questions" }
+    ]
+  }
+}
+```
+
+Both `id` and `details` are optional: a note is only guaranteed to carry a `title`. The `data`
+object repeats the `success` flag and carries an `error` string when the scrape fails.
+
+---
+
+## 20c. Read a Note
+
+### `POST /content/notes/get`
+
+Return the title and full text of one note, identified by title or by ID.
+
+Browser-driven like the listing above: the note is located in the Studio panel, opened, and its text
+read from the page.
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/content/notes/get \
+  -H "Content-Type: application/json" \
+  -d '{
+    "note_title": "Key Findings Summary"
+  }'
+```
+
+**Body Parameters:**
+
+| Parameter      | Type   | Required  | Description                                     |
+| -------------- | ------ | --------- | ----------------------------------------------- |
+| `note_title`   | string | ✅ One of | Title of the note to read                       |
+| `note_id`      | string | ✅ One of | ID of the note, from `POST /content/notes/list` |
+| `notebook_url` | string | ❌ No     | Target notebook URL                             |
+| `session_id`   | string | ❌ No     | Reuse an existing session                       |
+
+At least one of `note_title` and `note_id` must be present; the other is optional.
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "success": true,
+    "title": "Key Findings Summary",
+    "content": "## Main Points\n\n1. First important finding\n..."
+  }
+}
+```
+
+**Error Response (400):**
+
+```json
+{
+  "success": false,
+  "error": "Missing required parameter: note_title or note_id"
+}
+```
+
+A note that cannot be found returns 200 with `success: false` and
+`Note not found: "Key Findings Summary"`.
 
 ## 21. Save Chat to Note
 

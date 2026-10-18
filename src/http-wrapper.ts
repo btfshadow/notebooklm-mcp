@@ -777,24 +777,6 @@ app.post('/notebooks/:id/labels', async (req: Request, res: Response) => {
   }
 });
 
-// Delete a generated Studio artifact — RPC extension.
-app.delete('/content/:contentId', async (req: Request, res: Response) => {
-  try {
-    const { notebook_url, notebook_id } = req.query as Record<string, string | undefined>;
-    res.json(
-      await toolHandlers.handleDeleteContent({
-        content_id: req.params.contentId,
-        notebook_url,
-        notebook_id,
-      })
-    );
-  } catch (error) {
-    res
-      .status(500)
-      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
-  }
-});
-
 // List a notebook's sources with their IDs — RPC extension.
 app.get('/notebooks/:id/sources', async (req: Request, res: Response) => {
   try {
@@ -974,6 +956,28 @@ app.delete('/content/sources', async (req: Request, res: Response) => {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+});
+
+// Declared AFTER the literal /content/sources routes on purpose: Express
+// matches in declaration order, so a parameterised route placed earlier
+// swallows every literal sibling. It did — DELETE /content/sources was
+// unreachable, arriving here as an artifact id of "sources".
+// Delete a generated Studio artifact — RPC extension.
+app.delete('/content/:contentId', async (req: Request, res: Response) => {
+  try {
+    const { notebook_url, notebook_id } = req.query as Record<string, string | undefined>;
+    res.json(
+      await toolHandlers.handleDeleteContent({
+        content_id: req.params.contentId,
+        notebook_url,
+        notebook_id,
+      })
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 
