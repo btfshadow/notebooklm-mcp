@@ -29,7 +29,9 @@ jobs:
         run: npm ci
 
       - name: Verify version sync (plugin manifest, docs, README)
-        run: npm run version:check
+        run: |
+          npm run version:check
+          npm run facts:check
 
       - name: Build
         run: npm run build

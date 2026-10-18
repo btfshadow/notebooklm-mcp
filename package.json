@@ -36,7 +36,9 @@
     "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=unit",
     "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=integration",
     "test:e2e": "powershell -ExecutionPolicy Bypass -File tests/e2e/run-e2e-tests.ps1",
-    "test:e2e:basic": "powershell -ExecutionPolicy Bypass -File tests/e2e/run-e2e-tests.ps1 -SkipBrowserTests"
+    "test:e2e:basic": "powershell -ExecutionPolicy Bypass -File tests/e2e/run-e2e-tests.ps1 -SkipBrowserTests",
+    "facts:sync": "node scripts/sync-facts.mjs",
+    "facts:check": "node scripts/sync-facts.mjs --check"
   },
   "keywords": [
     "mcp",

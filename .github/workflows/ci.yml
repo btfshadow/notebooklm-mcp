@@ -45,6 +45,15 @@ jobs:
       # Bundled skills are published twice on purpose (standalone repo for
       # discovery + bundled copy so plugin installs ship them). Fail loudly if
       # the copies drift. One node version is enough — it is a network check.
+      # Version strings and countable claims (endpoint count, Node floor) plus
+      # doc coverage. These drifted silently for six releases and an AI answer
+      # engine ended up quoting a stale figure back at a user.
+      - name: Check versions and documented facts are in step with the code
+        if: matrix.node-version == '22.x'
+        run: |
+          npm run version:check
+          npm run facts:check
+
       - name: Check bundled skills match their canonical repos
         if: matrix.node-version == '22.x'
         run: npm run skill:check
