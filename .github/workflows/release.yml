@@ -119,6 +119,25 @@ jobs:
           tar -xzf mcp-publisher.tar.gz mcp-publisher
           chmod +x mcp-publisher
 
+      # npm accepts a publish before the version is readable from the registry,
+      # and the MCP registry validates against that read. The gap is a minute
+      # or two, and it failed this job on 3.2.0, 4.0.0 and 4.1.0 — each time
+      # needing a manual re-run of a release that had actually succeeded.
+      - name: Wait for npm to serve the new version
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          for attempt in $(seq 1 30); do
+            if [ "$(npm view "@roomi-fields/notebooklm-mcp@${VERSION}" version 2>/dev/null)" = "${VERSION}" ]; then
+              echo "npm is serving ${VERSION} (after ${attempt} attempt(s))"
+              exit 0
+            fi
+            echo "attempt ${attempt}: ${VERSION} not on npm yet, waiting 20s"
+            sleep 20
+          done
+          echo "::error::npm never served ${VERSION} after 10 minutes"
+          exit 1
+
       - name: Publish server.json (GitHub OIDC auth)
         run: |
           set -euo pipefail
