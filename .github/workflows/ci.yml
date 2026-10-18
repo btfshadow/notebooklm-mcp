@@ -79,4 +79,6 @@ jobs:
         run: npm ci
 
       - name: Run security audit (production deps only)
-        run: npm audit --omit=dev --audit-level=moderate
+        # Same moderate bar, but advisories with no upstream fix must be named
+        # and justified in the script rather than silently tolerated.
+        run: node scripts/audit-check.mjs
