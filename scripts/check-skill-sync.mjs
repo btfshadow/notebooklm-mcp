@@ -14,6 +14,8 @@
  */
 import { execFileSync } from 'node:child_process';
 
+import { ENDPOINTS } from './lib/facts.mjs';
+
 /** bundled skill dir -> canonical location in its standalone repo */
 const SKILLS = [
   {
@@ -21,6 +23,16 @@ const SKILLS = [
     repo: 'roomi-fields/notebooklm-skill',
     ref: 'main',
     remotePrefix: 'skills/notebooklm',
+    // The standalone repo's own README sits outside the bundled prefix, so the
+    // blob comparison cannot see it. It restates countable claims, so check the
+    // numbers against the code the same way `sync-facts.mjs` does locally.
+    claims: [
+      {
+        file: 'README.md',
+        pattern: /(\d+) REST endpoints/,
+        expected: () => ENDPOINTS,
+      },
+    ],
   },
 ];
 
@@ -36,6 +48,39 @@ function localBlobs(dir) {
     map.set(path.slice(dir.length + 1), sha);
   }
   return map;
+}
+
+async function ghJson(url) {
+  const res = await fetch(url, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'skill-sync-guard',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) throw new Error(`GitHub ${res.status} on ${url} (${await res.text()})`);
+  return res.json();
+}
+
+async function remoteText({ repo, ref }, file) {
+  const { content } = await ghJson(
+    `https://api.github.com/repos/${repo}/contents/${file}?ref=${ref}`
+  );
+  return Buffer.from(content, 'base64').toString('utf8');
+}
+
+/** The standalone repo's prose must repeat the numbers the code actually has. */
+async function staleClaims(skill) {
+  const stale = [];
+  for (const { file, pattern, expected } of skill.claims ?? []) {
+    const text = await remoteText(skill, file);
+    const found = pattern.exec(text);
+    const want = expected();
+    if (!found) stale.push(`claim missing:  ${file} has no match for ${pattern}`);
+    else if (found[1] !== String(want))
+      stale.push(`claim stale:    ${file} says ${found[1]}, the code says ${want}`);
+  }
+  return stale;
 }
 
 async function remoteBlobs({ repo, ref, remotePrefix }) {
@@ -84,6 +129,12 @@ for (const skill of SKILLS) {
   }
   for (const path of remote.keys()) {
     if (!local.has(path)) problems.push(`only upstream:  ${path}`);
+  }
+
+  try {
+    problems.push(...(await staleClaims(skill)));
+  } catch (e) {
+    problems.push(`cannot read the claims in ${skill.repo}: ${e.message}`);
   }
 
   if (problems.length) {

@@ -18,41 +18,12 @@
  *   node scripts/sync-facts.mjs --check   # exit 1 if anything would change
  */
 
-import { readFileSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { writeFileSync } from 'fs';
+import { join } from 'path';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+import { ENDPOINTS, NODE, ROOT, TOOLS, read, routes } from './lib/facts.mjs';
+
 const CHECK = process.argv.includes('--check');
-
-const read = (p) => readFileSync(join(ROOT, p), 'utf-8');
-
-// ---------------------------------------------------------------- the facts
-
-const routeLine = /^app\.(get|post|put|delete|patch)\('([^']+)'/gm;
-
-function routes() {
-  const found = [];
-  const src = read('src/http-wrapper.ts');
-  for (const m of src.matchAll(routeLine)) found.push(`${m[1].toUpperCase()} ${m[2]}`);
-  return [...new Set(found)].sort();
-}
-
-function toolNames() {
-  const src = read('src/tools/index.ts');
-  return [...new Set([...src.matchAll(/name: '([a-z_]+)'/g)].map((m) => m[1]))].sort();
-}
-
-function nodeFloor() {
-  const pkg = JSON.parse(read('package.json'));
-  const match = /(\d+)/.exec(pkg.engines?.node ?? '');
-  if (!match) throw new Error('package.json has no engines.node to read');
-  return match[1];
-}
-
-const ENDPOINTS = routes().length;
-const TOOLS = toolNames().length;
-const NODE = nodeFloor();
 
 // --------------------------------------------------------------- the claims
 
@@ -84,6 +55,12 @@ const TARGETS = [
       [/All \d+ endpoints the server exposes/g, `All ${ENDPOINTS} endpoints the server exposes`],
       [/carries the same \d+/g, `carries the same ${ENDPOINTS}`],
     ],
+  },
+  {
+    // The skill ships twice (bundled here, standalone repo for discovery);
+    // `skill:check` then forces the standalone copy to follow.
+    path: 'skills/notebooklm/references/rest-api.md',
+    rules: [[/the full \d+\./g, `the full ${ENDPOINTS}.`]],
   },
   {
     path: 'website/scripts/sync-docs.mjs',
