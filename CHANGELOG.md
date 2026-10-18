@@ -59,6 +59,31 @@ Local use through `npm run start:http`, the stdio MCP server, and the bundled
 proxy need no change: the proxy and `doctor:http` forward the token when one is
 set. New guide: [Securing the HTTP API](./deployment/docs/15-SECURITY.md).
 
+### Fixed — an account could vanish on creation
+
+Account ids were built from the millisecond clock alone, so two accounts
+created inside the same millisecond shared an id and the second silently
+replaced the first. No error, no warning, one account simply gone — rare by
+hand, routine from a script. Ids now carry a random suffix; existing ids are
+untouched.
+
+It surfaced as a Node 18 test failure that looked like flakiness. It was the
+bug reporting itself.
+
+### Fixed — dependency advisories, and the four that have no fix
+
+Raised past new advisories on `fast-uri`, `hono`, `ip-address`, a critical
+IP-spoofing one on `proxy-addr`, and an OAuth credential leak in the MCP SDK
+(now 1.32.1).
+
+Four remain in the file-search chain (`braces`, `micromatch`, `fast-glob`,
+`globby`) with no patched version upstream; npm's only suggestion is a
+two-major downgrade. Every pattern we pass is a string literal in the cleanup
+manager, so the attacker-supplied pattern the advisory needs has no way in.
+Rather than lower the audit bar and hide the next real one, the audit step now
+requires each unfixable advisory to be named, justified and given a review
+date — an exception past its date fails the build.
+
 ---
 
 ## [3.2.0] - 2026-09-03
