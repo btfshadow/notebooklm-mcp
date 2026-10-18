@@ -3,7 +3,8 @@
 > **Coverage note.** The server exposes 45 endpoints; 32 are documented below.
 > The 13 still missing are the newest ones — study aids, mind maps, source
 > research, labels, sharing, content deletion and `/batch-to-vault`. Until
-> they are written up, the [OpenAPI spec](./openapi.yaml) is the complete list.
+> they are written up, the [OpenAPI spec](pathname:///openapi.yaml) is the
+> complete list — it covers all 45, verified against the routes in the code.
 
 > Complete reference for the NotebookLM HTTP REST API. Citation-backed Q&A,
 > Studio content generation, notebook library, multi-account, sessions.
