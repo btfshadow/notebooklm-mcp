@@ -77,14 +77,17 @@ Not worth copying from them: the CLI/REPL, keychain integration, the
 batch/pipeline/tag orchestration layer (an agent orchestrates itself), and
 inter-process locks.
 
-### Documentation gaps that cost us visibility
+### API surface inconsistencies
 
-The REST API reference ranks for the queries we care about, and an AI answer
-engine citing it repeats whatever it says. It currently documents **32 of the
-45 endpoints**, and the 13 missing ones are precisely the differentiating
-features: study aids, mind maps, source research, labels, sharing, content
-deletion, `/batch-to-vault`. Writing them up is the highest-value SEO work
-available, ahead of anything to do with metadata.
+Spotted while documenting the 45 endpoints against their handlers. None is
+urgent; all are the kind of thing a caller discovers the hard way.
+
+| Issue                                                              | Detail                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Two error conventions**                                          | The RPC extensions (study aid, mind map, research, labels, share, content deletion) return validation failures as **HTTP 200 with `success: false`**, while `/ask`, `/batch-to-vault`, `/notebooks/bulk-delete` and `/content/notes/get` return 400. Pick one. |
+| **`PUT /notebooks/:id/share` with an empty body disables sharing** | It reads `req.body?.public === true`, so a malformed or empty request silently unshares a notebook instead of failing.                                                                                                                                         |
+| **`DELETE /content/:contentId` always reports success**            | It returns `deleted: true` without reading back, unlike the notebook bulk delete, which verifies. We learned this lesson once already with the wrong-tile deletion bug.                                                                                        |
+| **`/batch-to-vault` returns 400 for every failure**                | Including an unwritable output directory, which is a server-side condition, not a bad request.                                                                                                                                                                 |
 
 ### Live behaviours to re-test against the real service
 
