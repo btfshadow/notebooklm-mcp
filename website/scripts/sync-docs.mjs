@@ -245,7 +245,10 @@ const FRONTMATTER = {
       'notebooklm rest api alternative',
       'notebooklm studio api',
     ],
-    slug: '/migrate-from-pleaseprompto',
+    // Slug kept as /compare: the page changed purpose, but the URL has been
+    // live for months and carries whatever ranking it has earned. Title,
+    // description and keywords do the targeting; the path string does not.
+    slug: '/compare',
   },
   '15-SECURITY.md': {
     title: 'Securing the NotebookLM HTTP API — token, bind address, allowed origins',
