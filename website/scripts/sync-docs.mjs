@@ -232,19 +232,34 @@ const FRONTMATTER = {
     slug: '/notebooklm-rtfm',
   },
   '13-COMPARE.md': {
-    title: 'NotebookLM MCP comparison — alternatives, REST API, Studio, multi-account',
+    title: 'Migrating from PleasePrompto/notebooklm-mcp (archived) — tool mapping and comparison',
     description:
-      'Compare NotebookLM MCP servers and clients. Detailed feature matrix vs PleasePrompto/notebooklm-mcp v2.0.0 covering REST API, full Studio generation (video, infographic, report), multi-account auto-reauth with TOTP, n8n / Zapier / Make integration.',
+      'PleasePrompto/notebooklm-mcp was archived in September 2026. How to migrate: 17 of its 19 tool names work unchanged, the environment variables that differ, the one variable that means something else here, and a full feature comparison.',
     keywords: [
+      'pleaseprompto notebooklm-mcp archived',
+      'notebooklm-mcp unmaintained',
       'notebooklm-mcp alternative',
+      'migrate from notebooklm-mcp',
+      'notebooklm mcp replacement',
       'notebooklm mcp comparison',
-      'pleaseprompto vs roomi-fields',
       'notebooklm rest api alternative',
-      'notebooklm automation comparison',
       'notebooklm studio api',
-      'notebooklm n8n integration',
     ],
-    slug: '/compare',
+    slug: '/migrate-from-pleaseprompto',
+  },
+  '15-SECURITY.md': {
+    title: 'Securing the NotebookLM HTTP API — token, bind address, allowed origins',
+    description:
+      'Secure the NotebookLM REST API: loopback by default, NOTEBOOKLM_API_KEY required to expose it, NOTEBOOKLM_ALLOWED_ORIGINS for browser clients, Docker requirements, and how to report a vulnerability.',
+    keywords: [
+      'notebooklm mcp security',
+      'notebooklm api token',
+      'mcp server authentication',
+      'notebooklm rest api auth',
+      'mcp server exposed port',
+      'notebooklm api key',
+    ],
+    slug: '/security',
   },
 };
 
