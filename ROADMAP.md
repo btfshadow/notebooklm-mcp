@@ -2,7 +2,7 @@
 
 This document tracks planned features, recent implementations, and future ideas for the NotebookLM MCP Server.
 
-## Current Version: v4.1.0
+## Current Version: v4.2.0
 
 ---
 
@@ -16,14 +16,6 @@ Sources for the imported items: a read of `teng-lin/notebooklm-py` v0.8.5
 `jacob-bd/gemini-notebook-mcp-cli` v0.15.6 release notes and docs, 2026-10-18.
 Both are MIT-ish prior art for protocol facts only — we write our own
 implementation and cite the source in the code, per `.claude/CLAUDE.md`.
-
-### Now — security
-
-| Item                                        | Why                                                                                                                                                                                                                                                                                                                                                               |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Confine `add_source` file paths**         | The always-allowed data directory holds `browser_state/state.json`, `accounts.json` and the Chrome profile. A poisoned source can have the agent upload our own Google session into a notebook, which `share_notebook` can then make public. Current check compares strings without a separator, never resolves symlinks, and allows the whole working directory. |
-| **Confine `download_content` output paths** | `output_path` is written verbatim (`src/tools/index.ts`, `src/content/content-manager.ts`). Same class as CVE-2026-61647, and the same hole a competitor patched in their v0.10.1 (GHSA-92q4-9x75-55rf).                                                                                                                                                          |
-| **One shared guard**                        | `resolveVaultDir` already does this correctly for the vault only. Extract it, apply it to all three write paths, and resolve before checking — then write to the resolved path, not the original string.                                                                                                                                                          |
 
 ### Next — tools for RPCs we already implement
 
@@ -136,6 +128,15 @@ Verified dead or no-op upstream — knowing this is worth as much as the rest.
 ---
 
 ## Recently Implemented
+
+### v4.2.0 - Caller-supplied file paths are confined
+
+`add_source`, `download_content` and the batch writer all take a path from the
+caller. The data directory was an allowed root and holds the live Google
+session, so a poisoned source could have the agent upload it into a notebook.
+One shared guard now resolves before checking, follows symlinks, compares whole
+segments, and refuses the session store whatever the roots allow. See
+`src/utils/safe-paths.ts`.
 
 ### v3.0.0 - Dual transport (internal RPC API) + 5 new tools
 

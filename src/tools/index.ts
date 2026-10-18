@@ -56,6 +56,7 @@ import type {
 import { RateLimitError } from '../errors.js';
 import { CleanupManager } from '../utils/cleanup-manager.js';
 import { randomDelay } from '../utils/stealth-utils.js';
+import { confinePath, downloadRoots } from '../utils/safe-paths.js';
 import type { Page } from 'patchright';
 import { BatchExecuteClient } from '../rpc/batchexecute.js';
 import { NotebookRpc } from '../rpc/notebooks-rpc.js';
@@ -3877,7 +3878,11 @@ export class ToolHandlers {
             throw new Error('media URL returned HTML (auth/redirect), not the file');
           }
           const safeName = (artifact.title || content_type).replace(/[^\w.-]+/g, '_').slice(0, 80);
-          const savePath = output_path || path.join(CONFIG.dataDir, `${safeName}.${ext}`);
+          // Confine before writing: output_path arrives from the caller, and the
+          // RPC path used to write it verbatim anywhere on disk.
+          const savePath = output_path
+            ? confinePath(output_path, { roots: downloadRoots(), what: 'output_path' })
+            : path.join(CONFIG.dataDir, `${safeName}.${ext}`);
           fs.writeFileSync(savePath, bytes);
           log.success(`  ✅ (RPC) downloaded ${content_type}: ${savePath} (${bytes.length} bytes)`);
           return {

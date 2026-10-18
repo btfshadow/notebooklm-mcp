@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.2.0] - 2026-10-18
+
+### Security — the session store is no longer reachable through a file path
+
+Three parameters take a path from the caller: `file_path` on `add_source`,
+`output_path` on `download_content`, and `vault_dir` on the batch writer. An
+agent driving this server acts on text it was handed, so those paths are
+attacker-reachable — a poisoned document can tell the agent which file to add
+as a source.
+
+The data directory was an allowed root, and it holds `browser_state/`,
+`chrome_profile/` and `accounts.json`. Adding one of those as a source uploaded
+a live Google session into a notebook, which `share_notebook` could then make
+public. `output_path` was worse: it was written verbatim, anywhere on disk,
+including over those same files.
+
+All three now go through one guard:
+
+- the path is resolved before it is checked, not after;
+- symlinks are followed as far as the path exists, so a link inside an allowed
+  directory cannot walk out of it;
+- containment compares whole path segments, so `/data-evil` no longer passes a
+  check for `/data`;
+- the session store is refused whatever the allowed roots say;
+- callers receive the resolved path, and that is what gets opened.
+
+Operators can narrow the defaults with `NOTEBOOKLM_UPLOAD_ROOT` and
+`NOTEBOOKLM_DOWNLOAD_ROOT`, alongside the existing `NOTEBOOKLM_VAULT_ROOT`.
+Without them, a caller may name a path under the working directory or the data
+directory, minus the session store.
+
+No API change. A path that was legitimate before is still legitimate.
+
+---
+
 ## [4.1.0] - 2026-10-18
 
 ### Changed — Node 22 is the floor, and the last four advisories left with it

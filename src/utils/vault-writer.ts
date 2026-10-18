@@ -10,6 +10,7 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import { confinePath } from './safe-paths.js';
 import type {
   AskQuestionResult,
   AskQuestionSuccess,
@@ -95,29 +96,13 @@ export function sanitizeSlugPrefix(prefix: string | undefined): string {
 /**
  * Resolve a caller-supplied `vault_dir` to an absolute path, optionally
  * enforcing containment under `NOTEBOOKLM_VAULT_ROOT` when that env var is
- * set. When the env var is unset, the legacy behaviour (any writable path) is
- * preserved for backward compatibility — operators who want strict containment
- * opt in by setting `NOTEBOOKLM_VAULT_ROOT`.
- *
- * Throws a clear error when the resolved path escapes the configured root.
+ * set. A vault is somewhere the operator chose, often outside this project, so
+ * there is no default containment — but the shared guard still refuses the
+ * session store and still resolves symlinks before deciding.
  */
 export function resolveVaultDir(input: string): string {
-  if (!input || typeof input !== 'string') {
-    throw new Error('vault_dir is required');
-  }
   const root = process.env.NOTEBOOKLM_VAULT_ROOT;
-  if (!root) {
-    return path.resolve(input);
-  }
-  const absRoot = path.resolve(root);
-  const candidate = path.isAbsolute(input) ? path.resolve(input) : path.resolve(absRoot, input);
-  const rel = path.relative(absRoot, candidate);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
-    throw new Error(
-      `vault_dir "${input}" escapes NOTEBOOKLM_VAULT_ROOT (${absRoot}); refusing to write outside the configured vault root`
-    );
-  }
-  return candidate;
+  return confinePath(input, { roots: root ? [root] : null, what: 'vault_dir' });
 }
 
 /**

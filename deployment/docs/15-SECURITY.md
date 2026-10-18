@@ -55,6 +55,44 @@ NOTEBOOKLM_ALLOWED_ORIGINS=https://app.example,https://staging.example npm run s
 There is no wildcard. A page served from an origin you did not list gets `403`,
 whether it is reading or writing.
 
+## Files the caller can name
+
+Three parameters take a filesystem path: `file_path` on `add_source`,
+`output_path` on `download_content`, and `vault_dir` on the batch writer. An
+agent driving this server acts on text it was handed, so a poisoned document
+can tell it which file to add as a source. Those paths are treated as hostile.
+
+Every one of them is resolved first, then checked. Symlinks are followed as far
+as the path exists, and containment is compared segment by segment, so a link
+pointing out of an allowed directory and a sibling like `/data-evil` are both
+refused.
+
+**The session store is never reachable**, whatever else is allowed:
+
+| Path                               | Holds                         |
+| ---------------------------------- | ----------------------------- |
+| `<data>/browser_state/`            | the live Google session       |
+| `<data>/chrome_profile/`           | the logged-in browser profile |
+| `<data>/chrome_profile_instances/` | per-account profiles          |
+| `<data>/accounts.json`             | stored account credentials    |
+
+That matters because the data directory is otherwise a legitimate place to read
+and write: downloads land there. Without the rule, `add_source` could upload
+your own Google session into a notebook, and `share_notebook` could then make
+it public.
+
+By default a caller may name a path under the working directory or the data
+directory. Narrow it when the server runs anywhere untrusted:
+
+| Variable                   | Narrows                            |
+| -------------------------- | ---------------------------------- |
+| `NOTEBOOKLM_UPLOAD_ROOT`   | where `add_source` may read        |
+| `NOTEBOOKLM_DOWNLOAD_ROOT` | where `download_content` may write |
+| `NOTEBOOKLM_VAULT_ROOT`    | where the batch writer may write   |
+
+A vault is somewhere you chose, often outside the project, so `vault_dir` has
+no default containment — but it is still refused the session store.
+
 ## Docker
 
 The container binds `0.0.0.0` — a published port is useless otherwise — so it

@@ -16,6 +16,7 @@ import { randomDelay, realisticClick } from '../utils/stealth-utils.js';
 import { log } from '../utils/logger.js';
 import { CONFIG } from '../config.js';
 import { snapshotAllResponses } from '../utils/page-utils.js';
+import { confinePath, downloadRoots, uploadRoots } from '../utils/safe-paths.js';
 import { setLocale, tAll } from '../i18n/index.js';
 
 // Initialize i18n with configured locale
@@ -438,20 +439,15 @@ export class ContentManager {
       return { success: false, error: 'File path is required' };
     }
 
-    // Path traversal protection: resolve first, then validate startsWith(allowedDir)
-    const resolvedPath = path.resolve(input.filePath);
-    const allowedDir = path.resolve(CONFIG.dataDir);
-
-    // Allow files from dataDir or current working directory
-    const cwd = path.resolve(process.cwd());
-    const isAllowed = resolvedPath.startsWith(allowedDir) || resolvedPath.startsWith(cwd);
-
-    if (!isAllowed) {
-      log.warning(`  ⚠️ Path traversal attempt blocked: ${input.filePath}`);
-      return {
-        success: false,
-        error: 'File path not allowed: must be within data directory or current working directory',
-      };
+    // The caller's path is attacker-reachable: an agent adds whatever source a
+    // document tells it to. Resolve and confine before touching the filesystem.
+    let resolvedPath: string;
+    try {
+      resolvedPath = confinePath(input.filePath, { roots: uploadRoots(), what: 'file_path' });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      log.warning(`  ⚠️ Refused source path: ${message}`);
+      return { success: false, error: message };
     }
 
     if (!existsSync(resolvedPath)) {
@@ -2989,7 +2985,9 @@ export class ContentManager {
       const download = await downloadPromise;
 
       const suggestedName = download.suggestedFilename();
-      const savePath = outputPath || path.join(CONFIG.dataDir, suggestedName);
+      const savePath = outputPath
+        ? confinePath(outputPath, { roots: downloadRoots(), what: 'output_path' })
+        : path.join(CONFIG.dataDir, suggestedName);
       await download.saveAs(savePath);
 
       // Prefer the real extension from the downloaded filename; the map is a

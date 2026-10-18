@@ -112,3 +112,6 @@ C:\\Users\\*
 
 # RTFM local database
 .rtfm/
+
+# CodeGraph index (local, rebuilt on demand)
+.codegraph/

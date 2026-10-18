@@ -114,7 +114,7 @@ describe('ContentManager', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('not allowed');
+      expect(result.error).toMatch(/escapes the allowed directories/);
     });
 
     it('should require URL for url type', async () => {
