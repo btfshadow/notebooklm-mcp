@@ -6,6 +6,7 @@
  *   - README.md                    (hero "v1.x.x — ..." line)
  *   - server.json                  (MCP Registry manifest, two fields)
  *   - deployment/docs/openapi.yaml (REST spec info.version)
+ *   - website/static/llms.txt      (the AI-facing entry point)
  *   - ROADMAP.md                   ("## Current Version" header)
  *
  * Usage:
@@ -73,6 +74,15 @@ const targets = [
     // while the package shipped 3.0.0). Global replace hits both; the "$schema"
     // URL has no "version" key so it is untouched.
     transform: (s) => s.replace(/("version":\s*)"\d+\.\d+\.\d+"/g, `$1"${VERSION}"`),
+  },
+  {
+    path: 'website/static/llms.txt',
+    label: 'llms.txt version line',
+    // The one file written for AI answer engines, and the one that had
+    // drifted furthest: it still announced 1.5.9 and "33 endpoints" while
+    // the package shipped 4.1.0 with 45 — so engines quoting us repeated a
+    // version six releases old. Nothing else was syncing it.
+    transform: (s) => s.replace(/(current version )\d+\.\d+\.\d+/, `$1${VERSION}`),
   },
   {
     path: 'deployment/docs/openapi.yaml',

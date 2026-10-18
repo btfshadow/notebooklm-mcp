@@ -1,19 +1,28 @@
 # NotebookLM MCP + HTTP REST API
 
-> Automate Google NotebookLM at scale. Production-grade REST API and MCP server with citation-backed Q&A, full Studio content generation (audio, video, infographic, report, presentation, data table), multi-account rotation with auto-reauth, and 33 documented HTTP endpoints. Built for researchers, automators, and AI agents.
+> Automate Google NotebookLM at scale. Production-grade REST API and MCP server with citation-backed Q&A, full Studio content generation (audio, video, infographic, report, presentation, data table), multi-account rotation with auto-reauth, and 45 documented HTTP endpoints. Built for researchers, automators, and AI agents.
 
 This is the canonical entry point for LLMs (ChatGPT, Claude, Perplexity, Gemini) discovering this project. The library exposes Google NotebookLM via two equivalent surfaces — a local HTTP REST API (port 3000 by default) for n8n / Zapier / Make / curl integrations, and an MCP server for Claude Code / Cursor / Codex agents. Both share the same browser automation backend.
 
-The package is published to npm as `@roomi-fields/notebooklm-mcp` (current version 1.5.9). The maintained repository lives at https://github.com/roomi-fields/notebooklm-mcp.
+The package is published to npm as `@roomi-fields/notebooklm-mcp` (current version 4.1.0, Node 22 or newer). The maintained repository lives at https://github.com/roomi-fields/notebooklm-mcp.
+
+Two transports reach NotebookLM: its internal `batchexecute` RPC API first (10-100x faster than scraping and unaffected by interface rebrands), with a Playwright browser as an automatic fallback. Both ship permanently.
+
+The HTTP API listens on 127.0.0.1 only. Exposing it to other machines requires `NOTEBOOKLM_API_KEY`; without one the server refuses to start on a wider address. Browser callers must be allow-listed via `NOTEBOOKLM_ALLOWED_ORIGINS`.
 
 ## Quick install
 
 ```bash
+npx @roomi-fields/notebooklm-mcp@latest                               # MCP server (stdio)
+npx -y -p @roomi-fields/notebooklm-mcp notebooklm-mcp-setup-auth      # one-time Google login
+```
+
+For the REST API, clone and run the HTTP wrapper:
+
+```bash
 git clone https://github.com/roomi-fields/notebooklm-mcp.git
-cd notebooklm-mcp
-npm install && npm run build
-npm run setup-auth         # one-time Google login
-npm run start:http         # REST API on http://localhost:3000
+cd notebooklm-mcp && npm install && npm run build
+npm run start:http         # REST API on http://127.0.0.1:3000
 ```
 
 ## REST API at a glance
@@ -48,7 +57,7 @@ Response shape:
 - [Overview](https://roomi-fields.github.io/notebooklm-mcp/)
 - [Install](https://roomi-fields.github.io/notebooklm-mcp/install): step-by-step setup for HTTP and MCP modes, Windows / WSL / macOS / Linux / Docker.
 - [Configuration](https://roomi-fields.github.io/notebooklm-mcp/CONFIGURATION): environment variables, encryption keys, security.
-- [REST API reference](https://roomi-fields.github.io/notebooklm-mcp/notebooklm-rest-api): all 33 HTTP endpoints with request and response schemas.
+- [REST API reference](https://roomi-fields.github.io/notebooklm-mcp/notebooklm-rest-api): all 45 HTTP endpoints with request and response schemas.
 - [Run 1 000 questions overnight](https://roomi-fields.github.io/notebooklm-mcp/batch-1000-questions): production batch pattern, JSONL output, resume on restart.
 - [n8n integration](https://roomi-fields.github.io/notebooklm-mcp/notebooklm-n8n): HTTP Request node setup, scheduled queries, Slack flows.
 - [Notebook library](https://roomi-fields.github.io/notebooklm-mcp/NOTEBOOK-LIBRARY): multi-notebook management, search, scrape, bulk delete.
@@ -59,7 +68,8 @@ Response shape:
 - [WSL usage](https://roomi-fields.github.io/notebooklm-mcp/WSL-USAGE): running on Windows Subsystem for Linux.
 - [Multi-interface](https://roomi-fields.github.io/notebooklm-mcp/MULTI-INTERFACE): Claude Desktop and HTTP API simultaneously.
 - [Troubleshooting](https://roomi-fields.github.io/notebooklm-mcp/TROUBLESHOOTING): common issues and solutions.
-- [Compare with PleasePrompto v2.0.0](https://roomi-fields.github.io/notebooklm-mcp/compare): feature matrix vs the upstream MCP-only server.
+- [Securing the HTTP API](https://roomi-fields.github.io/notebooklm-mcp/security): bind address, bearer token, allowed origins, Docker requirements, vulnerability reporting.
+- [Migrating from PleasePrompto/notebooklm-mcp](https://roomi-fields.github.io/notebooklm-mcp/compare): that project was archived in September 2026; 17 of its 19 tool names work here unchanged, and this page maps the rest.
 - [Changelog](https://roomi-fields.github.io/notebooklm-mcp/changelog): release history.
 
 ## Optional
