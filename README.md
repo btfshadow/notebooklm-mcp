@@ -184,7 +184,7 @@ curl -X POST http://localhost:3000/ask \
   -d '{"question": "Summarize chapter 3", "notebook_id": "your-id", "source_format": "json"}'
 ```
 
-The full surface is **33 documented endpoints** — see the [REST API reference](https://roomi-fields.github.io/notebooklm-mcp/notebooklm-rest-api). For overnight batches of 1 000+ questions, see the [batch pattern](https://roomi-fields.github.io/notebooklm-mcp/batch-1000-questions).
+The full surface is **33 documented endpoints** — see the [REST API reference](https://notebooklm.roomi-fields.com/notebooklm-rest-api). For overnight batches of 1 000+ questions, see the [batch pattern](https://notebooklm.roomi-fields.com/batch-1000-questions).
 
 ### Option 2 — MCP Mode (Claude Code, Cursor, Codex)
 
@@ -241,7 +241,7 @@ See [Docker Guide](./deployment/docs/08-DOCKER.md) for NAS deployment (Synology,
 
 ## Documentation
 
-Full docs site: **<https://roomi-fields.github.io/notebooklm-mcp/>** · [OpenAPI 3.1 spec](./deployment/docs/openapi.yaml)
+Full docs site: **<https://notebooklm.roomi-fields.com/>** · [OpenAPI 3.1 spec](./deployment/docs/openapi.yaml)
 
 | Guide                                                                                        | Description                                                                                                                       |
 | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |

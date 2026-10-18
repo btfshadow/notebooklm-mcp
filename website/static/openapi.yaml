@@ -9,7 +9,7 @@ info:
 
     Companion to the MCP server in the same package
     (`@roomi-fields/notebooklm-mcp`). See
-    https://roomi-fields.github.io/notebooklm-mcp/ for the full guide.
+    https://notebooklm.roomi-fields.com/ for the full guide.
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT

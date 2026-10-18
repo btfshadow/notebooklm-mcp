@@ -54,26 +54,26 @@ Response shape:
 
 ## Documentation index
 
-- [Overview](https://roomi-fields.github.io/notebooklm-mcp/)
-- [Install](https://roomi-fields.github.io/notebooklm-mcp/install): step-by-step setup for HTTP and MCP modes, Windows / WSL / macOS / Linux / Docker.
-- [Configuration](https://roomi-fields.github.io/notebooklm-mcp/CONFIGURATION): environment variables, encryption keys, security.
-- [REST API reference](https://roomi-fields.github.io/notebooklm-mcp/notebooklm-rest-api): all 45 HTTP endpoints with request and response schemas.
-- [Run 1 000 questions overnight](https://roomi-fields.github.io/notebooklm-mcp/batch-1000-questions): production batch pattern, JSONL output, resume on restart.
-- [n8n integration](https://roomi-fields.github.io/notebooklm-mcp/notebooklm-n8n): HTTP Request node setup, scheduled queries, Slack flows.
-- [Notebook library](https://roomi-fields.github.io/notebooklm-mcp/NOTEBOOK-LIBRARY): multi-notebook management, search, scrape, bulk delete.
-- [Auto-discovery](https://roomi-fields.github.io/notebooklm-mcp/AUTO-DISCOVERY): autonomous metadata generation via NotebookLM queries.
-- [Content management](https://roomi-fields.github.io/notebooklm-mcp/CONTENT-MANAGEMENT): sources, audio, video, infographic, report, presentation, data table generation.
-- [Multi-account](https://roomi-fields.github.io/notebooklm-mcp/notebooklm-multi-account): account rotation, auto-reauth with TOTP support.
-- [Docker](https://roomi-fields.github.io/notebooklm-mcp/DOCKER): containerized deployment with noVNC, Synology / QNAP NAS support.
-- [WSL usage](https://roomi-fields.github.io/notebooklm-mcp/WSL-USAGE): running on Windows Subsystem for Linux.
-- [Multi-interface](https://roomi-fields.github.io/notebooklm-mcp/MULTI-INTERFACE): Claude Desktop and HTTP API simultaneously.
-- [Troubleshooting](https://roomi-fields.github.io/notebooklm-mcp/TROUBLESHOOTING): common issues and solutions.
-- [Securing the HTTP API](https://roomi-fields.github.io/notebooklm-mcp/security): bind address, bearer token, allowed origins, Docker requirements, vulnerability reporting.
-- [Migrating from PleasePrompto/notebooklm-mcp](https://roomi-fields.github.io/notebooklm-mcp/compare): that project was archived in September 2026; 17 of its 19 tool names work here unchanged, and this page maps the rest.
-- [Changelog](https://roomi-fields.github.io/notebooklm-mcp/changelog): release history.
+- [Overview](https://notebooklm.roomi-fields.com/)
+- [Install](https://notebooklm.roomi-fields.com/install): step-by-step setup for HTTP and MCP modes, Windows / WSL / macOS / Linux / Docker.
+- [Configuration](https://notebooklm.roomi-fields.com/CONFIGURATION): environment variables, encryption keys, security.
+- [REST API reference](https://notebooklm.roomi-fields.com/notebooklm-rest-api): all 45 HTTP endpoints with request and response schemas.
+- [Run 1 000 questions overnight](https://notebooklm.roomi-fields.com/batch-1000-questions): production batch pattern, JSONL output, resume on restart.
+- [n8n integration](https://notebooklm.roomi-fields.com/notebooklm-n8n): HTTP Request node setup, scheduled queries, Slack flows.
+- [Notebook library](https://notebooklm.roomi-fields.com/NOTEBOOK-LIBRARY): multi-notebook management, search, scrape, bulk delete.
+- [Auto-discovery](https://notebooklm.roomi-fields.com/AUTO-DISCOVERY): autonomous metadata generation via NotebookLM queries.
+- [Content management](https://notebooklm.roomi-fields.com/CONTENT-MANAGEMENT): sources, audio, video, infographic, report, presentation, data table generation.
+- [Multi-account](https://notebooklm.roomi-fields.com/notebooklm-multi-account): account rotation, auto-reauth with TOTP support.
+- [Docker](https://notebooklm.roomi-fields.com/DOCKER): containerized deployment with noVNC, Synology / QNAP NAS support.
+- [WSL usage](https://notebooklm.roomi-fields.com/WSL-USAGE): running on Windows Subsystem for Linux.
+- [Multi-interface](https://notebooklm.roomi-fields.com/MULTI-INTERFACE): Claude Desktop and HTTP API simultaneously.
+- [Troubleshooting](https://notebooklm.roomi-fields.com/TROUBLESHOOTING): common issues and solutions.
+- [Securing the HTTP API](https://notebooklm.roomi-fields.com/security): bind address, bearer token, allowed origins, Docker requirements, vulnerability reporting.
+- [Migrating from PleasePrompto/notebooklm-mcp](https://notebooklm.roomi-fields.com/compare): that project was archived in September 2026; 17 of its 19 tool names work here unchanged, and this page maps the rest.
+- [Changelog](https://notebooklm.roomi-fields.com/changelog): release history.
 
 ## Optional
 
 - [GitHub repository](https://github.com/roomi-fields/notebooklm-mcp): source code, issues, releases.
 - [npm package](https://www.npmjs.com/package/@roomi-fields/notebooklm-mcp): install via `npm install @roomi-fields/notebooklm-mcp` or `npx`.
-- [OpenAPI 3.1 spec](https://roomi-fields.github.io/notebooklm-mcp/openapi.yaml): importable in Postman / Insomnia / Bruno / Swagger UI.
+- [OpenAPI 3.1 spec](https://notebooklm.roomi-fields.com/openapi.yaml): importable in Postman / Insomnia / Bruno / Swagger UI.

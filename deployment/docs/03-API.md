@@ -134,7 +134,7 @@ curl http://localhost:3000/
     "read_source": "GET /notebooks/:id/sources/:sourceId",
     "sessions": "GET /sessions"
   },
-  "docs": "https://roomi-fields.github.io/notebooklm-mcp/"
+  "docs": "https://notebooklm.roomi-fields.com/"
 }
 ```
 

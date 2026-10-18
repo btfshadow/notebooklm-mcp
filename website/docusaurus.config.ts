@@ -12,8 +12,8 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://roomi-fields.github.io',
-  baseUrl: '/notebooklm-mcp/',
+  url: 'https://notebooklm.roomi-fields.com',
+  baseUrl: '/',
 
   organizationName: 'roomi-fields',
   projectName: 'notebooklm-mcp',
@@ -40,7 +40,7 @@ const config: Config = {
           'Google NotebookLM over MCP + a local HTTP REST API. Citation-backed Q&A, audio podcasts, video generation, multi-account rotation.',
         applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Windows, macOS, Linux',
-        url: 'https://roomi-fields.github.io/notebooklm-mcp/',
+        url: 'https://notebooklm.roomi-fields.com/',
         downloadUrl: 'https://www.npmjs.com/package/@roomi-fields/notebooklm-mcp',
         author: {
           '@type': 'Person',
