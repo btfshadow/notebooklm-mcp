@@ -92,7 +92,7 @@ describe('AccountManager', () => {
       await manager.initialize();
 
       const id = await manager.addAccount('test@gmail.com', 'password123');
-      expect(id).toMatch(/^account-\d+$/);
+      expect(id).toMatch(/^account-\d+-[0-9a-f]{8}$/);
       expect(manager.getAccountCount()).toBe(1);
       expect(manager.hasAccounts()).toBe(true);
     });
@@ -373,6 +373,20 @@ describe('AccountManager', () => {
 
       const health = await manager.healthCheck();
       expect(health.length).toBe(2);
+    });
+
+    it('keeps both accounts when two are added in the same millisecond', async () => {
+      // Regression: ids were `account-${Date.now()}`, so a fast caller lost one.
+      const manager = new AccountManager();
+      await manager.initialize();
+
+      const [first, second] = await Promise.all([
+        manager.addAccount('fast1@gmail.com', 'pass1'),
+        manager.addAccount('fast2@gmail.com', 'pass2'),
+      ]);
+
+      expect(first).not.toBe(second);
+      expect(await manager.healthCheck()).toHaveLength(2);
     });
 
     it('should report quota issues', async () => {

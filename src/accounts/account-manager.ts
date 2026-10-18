@@ -9,6 +9,7 @@
  * - Auto-login when sessions expire
  */
 
+import { randomUUID } from 'crypto';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
@@ -229,8 +230,11 @@ export class AccountManager {
       throw new Error('Account manager not initialized');
     }
 
-    // Generate unique ID
-    const id = `account-${Date.now()}`;
+    // Unique ID. The timestamp alone was not unique: two accounts added within
+    // the same millisecond produced the same id, and the second silently
+    // replaced the first in the account map — losing one for good. Rare by
+    // hand, routine from a script.
+    const id = `account-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
     // Create account config
     const accountConfig: AccountConfig = {
