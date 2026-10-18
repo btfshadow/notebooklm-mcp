@@ -9,9 +9,11 @@ describe('RateLimitError', () => {
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(RateLimitError);
       expect(error.name).toBe('RateLimitError');
-      expect(error.message).toBe(
-        'NotebookLM rate limit reached (50 queries/day for free accounts)'
-      );
+      // The allowance is compute-based and refreshes every 5 hours; the
+      // message must not quote a daily query count that no longer exists.
+      expect(error.message).toContain('usage limit reached');
+      expect(error.message).toContain('every 5 hours');
+      expect(error.message).not.toMatch(/per day|queries\/day/i);
     });
 
     it('should create error with custom message', () => {
@@ -190,7 +192,7 @@ describe('AuthenticationError', () => {
         if (error instanceof AuthenticationError) {
           expect(error.suggestCleanup).toBeDefined();
         } else if (error instanceof RateLimitError) {
-          expect(error.message).toContain('rate limit');
+          expect(error.message).toContain('usage limit');
         }
       });
     });

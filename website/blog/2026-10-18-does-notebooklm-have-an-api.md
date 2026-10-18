@@ -1,0 +1,89 @@
+---
+title: 'Does NotebookLM have an API? The 2026 answer'
+description: 'Google now ships a Gemini Notebook Enterprise API in preview, the standalone Podcast API is deprecated, and the consumer product still has no developer key. What each route actually gives you.'
+slug: does-notebooklm-have-an-api
+authors: [romain]
+tags: [notebooklm, api]
+---
+
+Yes and no, and the honest answer changed during 2026. Google does publish an
+API for Gemini Notebook Enterprise, in preview, behind a Cloud project and a
+licence. The consumer NotebookLM you log into with a personal Google account
+still has no developer key, and the standalone Podcast API that some posts
+point at is deprecated and not taking new customers.
+
+Most answers you will find say flatly "there is no API". That was true and is
+now wrong, which is worse than either.
+
+{/_ truncate _/}
+
+## What does the official API cover?
+
+Google documents a REST surface for Gemini Notebook Enterprise, including
+notebook operations and audio overviews — a notebook holds one audio overview
+at a time, created through `notebooks.audioOverviews.create`. It is marked
+pre-GA, which means the terms and the shape can both move.
+
+The access path is the part people miss. It needs a Google Cloud project and a
+Gemini Enterprise or Education Premium licence, set up by an administrator. It
+is not a key you sign up for on a developer console, and it does not reach the
+notebooks in your personal account.
+
+## What about the Podcast API?
+
+Deprecated. Google is not allowlisting new customers for it. If a tutorial
+tells you to request access, that tutorial is out of date.
+
+## So what do people actually use?
+
+Community projects that drive the same interfaces the web app uses. There are
+several, in Python and in Node, exposing them as a CLI, as an MCP server, or as
+a local REST API. They work, they are fast, and they reach your own notebooks
+with your own login.
+
+They also share one honest caveat: nothing about those interfaces is promised.
+Google can change them, and when it does the project breaks until someone
+fixes it. That has happened — the mid-2026 interface rebuild broke every such
+tool at once.
+
+## Which should you pick?
+
+Three questions settle it.
+
+**Do you have an enterprise licence and an administrator?** Then use the
+official API. It is supported, it is the only route with a contract behind it,
+and nothing below competes with that.
+
+**Do you need your own personal notebooks?** Then the official API is out, and
+a community tool is the only route that exists.
+
+**Do you need it to keep working unattended?** Weigh how quickly the project
+you pick has recovered from past breakages. That is the only signal that
+matters, and the commit history tells you more than the README.
+
+## When is a community tool the wrong answer?
+
+- When the work is contractual — a client deliverable, a regulated pipeline, an
+  SLA. An undocumented interface has no promise attached to it.
+- When you only need text generation over documents. The Gemini API is public,
+  supported and cheaper to reason about; NotebookLM's value is its grounding
+  and citation behaviour, not its text generation.
+- When you cannot run a browser anywhere. Login still happens in a real Chrome,
+  once, even for the tools that avoid the browser afterwards.
+
+## Trying this one
+
+Our own route is both an MCP server and a local REST API, so an agent and a
+workflow tool can use the same install.
+
+```bash
+# Claude Code
+/plugin marketplace add roomi-fields/claude-plugins
+/plugin install notebooklm@roomi-fields
+
+# Then log into Google once, in a terminal
+npx -y -p @roomi-fields/notebooklm-mcp notebooklm-mcp-setup-auth
+```
+
+Node 22 or newer. The REST route is in [the install guide](/install), and the
+full endpoint list is in [the API reference](/notebooklm-rest-api).

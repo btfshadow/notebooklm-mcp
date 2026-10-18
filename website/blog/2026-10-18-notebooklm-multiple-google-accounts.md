@@ -1,0 +1,86 @@
+---
+title: 'Running NotebookLM across multiple Google accounts'
+description: 'Rotating accounts multiplies a compute allowance, not a daily quota. How automatic rotation works, where the sessions live, and why that directory deserves more care than most people give it.'
+slug: notebooklm-multiple-google-accounts
+authors: [romain]
+tags: [notebooklm, accounts, quotas]
+---
+
+One Google account gives you one allowance. Several give you several, and a
+server that switches between them when one runs out keeps a long run moving.
+
+That is the whole idea, and it works. What is worth saying plainly is what it
+does not do, and what it asks you to hold on disk.
+
+{/_ truncate _/}
+
+## What rotation actually buys
+
+Since 2 September 2026, NotebookLM meters compute on a rolling five-hour
+window rather than counting chats per day. Rotation therefore multiplies a
+budget, not a quota.
+
+The difference matters when you plan. With a daily count you could say "three
+accounts, 150 questions". With an allowance you cannot: the same three
+accounts carry a long conversation over forty sources far less far than they
+carry short, fresh questions.
+
+What you get is continuity — the run does not stop at the first exhausted
+account — not a number to promise.
+
+## How does the switch work?
+
+The server keeps a session per account, notices the usage refusal, and moves
+to the next account that still has room. Each account has its own browser
+profile, so switching does not disturb the one currently in use.
+
+Re-authentication mid-run works the same way: the session for that account is
+refreshed on its own profile, then promoted, rather than restarting
+everything.
+
+## Where do the sessions live?
+
+Not in the project directory. They sit in the operating system's application
+data directory, outside any repository by construction. That is deliberate —
+you do not want a live Google session inside something you might commit or
+copy.
+
+One consequence surprises people: **sessions do not travel**. Copying cookies
+from one machine to another fails. Google binds them server-side to the device
+and address that created them, even when the local expiry says they are valid.
+Log in on the machine that will run the work.
+
+## Why that directory deserves care
+
+It holds live logins. Anything that can read it can act as you.
+
+We learned this the uncomfortable way. Our own file-upload tool treated that
+directory as an allowed location, so a document could have told an agent to
+add the session file as a source — and another tool could then have made the
+notebook public. It is fixed, and the lesson generalises: check what your
+tools can reach, not only what they are for.
+
+If you run several accounts, you are concentrating several logins in one
+place. Treat it accordingly.
+
+## When is rotation the wrong answer?
+
+- **When you re-ask the same questions.** Cache the answers instead. Paying
+  twice across two accounts is still paying twice.
+- **When the accounts are not yours.** Using colleagues' accounts to stretch
+  an allowance is a policy problem before it is a technical one.
+- **When one paid plan would do.** AI Plus doubles the allowance and AI Pro
+  quadruples it, with one login to secure instead of three.
+- **When the work must be reproducible.** Which account answered changes
+  nothing about correctness, but it does complicate an audit trail.
+
+## Trying this one
+
+```bash
+/plugin marketplace add roomi-fields/claude-plugins
+/plugin install notebooklm@roomi-fields
+```
+
+Adding accounts, inspecting their state and forcing a switch are covered in
+[multi-account](/notebooklm-multi-account). Where sessions are stored, and how
+to move them, is in [configuration](/CONFIGURATION).

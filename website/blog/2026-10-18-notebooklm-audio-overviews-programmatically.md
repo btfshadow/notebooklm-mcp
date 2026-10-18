@@ -1,0 +1,88 @@
+---
+title: 'Generating NotebookLM audio overviews programmatically'
+description: 'A notebook holds one audio overview at a time, the standalone Podcast API is deprecated, and the official route needs an enterprise licence. The three ways to script it and what each costs.'
+slug: notebooklm-audio-overviews-programmatically
+authors: [romain]
+tags: [notebooklm, audio, automation]
+---
+
+The audio overview is the feature that made NotebookLM famous, and the one
+people most want to run in a loop — one podcast per report, per client, per
+week. Doing that without clicking is possible by three different routes, and
+they are not equivalent.
+
+{/_ truncate _/}
+
+## The official route
+
+Google documents audio overview creation in the Gemini Notebook Enterprise
+API. A notebook holds one audio overview at a time, so a loop means creating
+notebooks, not stacking overviews.
+
+It is pre-GA, and it needs a Cloud project plus an enterprise or education
+licence with an administrator to turn it on. If you have that, stop reading —
+it is supported and nothing below is.
+
+The separate Podcast API that older tutorials point at is deprecated and not
+taking new customers.
+
+## Driving the browser
+
+The oldest community approach: a real browser clicks the same buttons you
+would. It works, it reaches your personal notebooks, and it is slow — minutes
+per generation, most of it waiting.
+
+Its weakness is the web app. When Google rebuilt the interface in mid-2026,
+every selector moved and every browser-driven tool broke at once.
+
+## Driving the internal interface
+
+Newer tools call the same internal requests the web app makes, skipping the
+page entirely. Generation that took minutes through the browser takes seconds
+to kick off, and the result is read back directly rather than scraped.
+
+It is immune to visual redesigns, because there is no selector to break. It is
+not immune to the interface itself changing, which is a different and rarer
+event.
+
+Our own server does this first and falls back to the browser when the internal
+route does not answer — deliberately, because the two break for different
+reasons and rarely at the same time.
+
+## What actually bites in a loop
+
+**You must own the notebook.** Google refuses Studio generation on notebooks
+merely shared with you. The refusal arrives as a permission status buried in
+the response, which is easy to misread as "the identifier changed" — we lost
+two investigations to exactly that before reading the raw body.
+
+**One overview per notebook.** Plan the loop around notebooks, not around
+generations.
+
+**Generation costs allowance.** Usage is compute-based and refreshes every
+five hours. Audio is one of the expensive features, so a batch will hit the
+ceiling sooner than the same number of questions would.
+
+**The download is not the obvious URL.** The media link serves a viewer page,
+not the file, so a naive fetch returns HTML that looks like a success.
+
+## When is this not worth automating?
+
+- **For a handful a month.** The web app is three clicks and no maintenance.
+- **When you need a specific voice, length or script.** You get the format
+  NotebookLM produces; a text-to-speech pipeline over your own script gives
+  you control it does not.
+- **When the output is client-facing and must arrive on a date.** An
+  undocumented interface and a compute allowance are two reasons it might not.
+
+## Trying this one
+
+```bash
+/plugin marketplace add roomi-fields/claude-plugins
+/plugin install notebooklm@roomi-fields
+npx -y -p @roomi-fields/notebooklm-mcp notebooklm-mcp-setup-auth
+```
+
+Generation, listing and download are covered in
+[content management](/CONTENT-MANAGEMENT); the REST equivalents are
+in [the API reference](/notebooklm-rest-api).

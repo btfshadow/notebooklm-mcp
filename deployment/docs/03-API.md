@@ -1185,7 +1185,7 @@ curl -X POST http://localhost:3000/re-auth \
 **Use cases:**
 
 - Switching Google accounts
-- Recovery from rate limits (50 queries/day on free accounts)
+- Recovery from usage limits (compute-based, refreshes every 5 hours)
 - Fresh authentication after errors
 
 ---

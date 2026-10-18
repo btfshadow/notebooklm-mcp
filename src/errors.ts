@@ -5,7 +5,8 @@
 /**
  * Error thrown when NotebookLM rate limit is exceeded
  *
- * Free users have 50 queries/day limit.
+ * Usage is compute-based since 2 September 2026: the allowance refreshes
+ * every 5 hours up to a weekly ceiling, and there is no query count.
  * This error indicates the user should:
  * - Use re_auth tool to switch Google accounts
  * - Wait until tomorrow for quota reset
@@ -13,7 +14,7 @@
  */
 export class RateLimitError extends Error {
   constructor(
-    message: string = 'NotebookLM rate limit reached (50 queries/day for free accounts)'
+    message: string = 'NotebookLM usage limit reached. The allowance is compute-based and refreshes every 5 hours; check Settings > Usage in NotebookLM for the reset time.'
   ) {
     super(message);
     this.name = 'RateLimitError';

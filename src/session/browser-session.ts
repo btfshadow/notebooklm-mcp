@@ -963,7 +963,7 @@ export class BrowserSession {
    * Detect if a rate limit error occurred
    *
    * Searches the page for error messages indicating rate limit/quota exhaustion.
-   * Free NotebookLM accounts have 50 queries/day limit.
+   * NotebookLM usage is compute-based and refreshes every 5 hours.
    *
    * @returns true if rate limit error detected, false otherwise
    */

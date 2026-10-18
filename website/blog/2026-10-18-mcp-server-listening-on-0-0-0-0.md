@@ -1,0 +1,110 @@
+---
+title: 'Your MCP server is probably listening on 0.0.0.0'
+description: 'Ours was, for 45 unauthenticated routes, until a stranger reported it. What the exposure actually allows, why loopback alone is not enough, and the three controls that close it.'
+slug: mcp-server-listening-on-0-0-0-0
+authors: [romain]
+tags: [mcp, security]
+---
+
+Until version 4.0.0 this server bound to every network interface, accepted any
+browser origin, and required no credential on any of its 45 routes. Anyone on
+the same Wi-Fi could drive it. Any web page you visited could drive it too.
+
+Someone reported it. We fixed it, published the advisory, and then found a
+second hole of the same family a few weeks later. Here is what we learned,
+written down because the pattern is not ours alone — researchers scanning
+public MCP servers keep finding the same three mistakes.
+
+{/_ truncate _/}
+
+## What does binding to 0.0.0.0 actually allow?
+
+It means the server answers on your laptop's address on the local network, not
+just on `localhost`. On a home network that is your household. On café Wi-Fi,
+a conference network or a shared office, it is everyone within reach.
+
+What they get is whatever your tools do. For us that was reading your
+notebooks, adding sources, generating content and sharing a notebook publicly.
+For other servers it has been arbitrary code execution — Penpot's MCP server
+and MCPJam's inspector both shipped unauthenticated execution endpoints bound
+to every interface.
+
+The exposure is not exotic. A survey of reachable MCP servers found hundreds
+with this shape, and a large minority with no authentication mechanism at all.
+
+## Is binding to 127.0.0.1 enough?
+
+No, and this is the part that surprises people. A web page you visit can make
+requests to `localhost` from inside your browser. If the server answers them,
+the page is driving your tools with your session, from the outside.
+
+That is not theory. CVE-2025-49596 in the MCP Inspector scored 9.4 precisely
+because a malicious site could reach a service listening only on loopback and
+get to code execution.
+
+The defence is to refuse requests that carry a foreign origin, rather than
+merely declining to send a permissive header back. Those are different things:
+the second blocks the page from _reading_ the reply, while the request still
+executes. For anything that writes, that distinction is the whole game.
+
+## What are the three controls?
+
+**Bind to loopback by default, and fail loudly otherwise.** Our server now
+refuses to start on a public interface unless a token is set. Not a warning —
+a refusal, because a warning in a log nobody reads is not a control.
+
+**Refuse foreign origins outright.** Requests from an origin that is not
+allow-listed get a 403 before any handler runs, reads included.
+
+**Require a token when exposed, and compare it in constant time.** The
+comparison detail is small but free: compare digests, not strings.
+
+In a container the first rule inverts — a published port is useless on
+loopback — so the entrypoint binds to all interfaces and exits with an
+explanation if no token is set.
+
+## What was the second hole?
+
+File paths. Three of our tools take a path from the caller: one reads a file to
+upload, two write one. The data directory was an allowed root, and that
+directory holds the live Google session.
+
+So a document could tell an agent to add the session file as a source, and
+another tool could then make that notebook public. Not a file leak — an account
+takeover, via a tool that looks like it only reads documents.
+
+Three things made it work, and all three are worth checking in your own code:
+
+- the path was checked before it was resolved, so the check applied to a string
+  that was not what got opened;
+- symlinks were never followed, so a link inside an allowed directory walked
+  straight out of it;
+- containment was a string prefix test, so `/data-evil` passed a check for
+  `/data`.
+
+## What would we tell someone shipping an MCP server today?
+
+- Default to loopback. Make exposure a deliberate act that fails without a
+  credential.
+- Treat every caller-supplied path as hostile. An agent acts on text it was
+  handed, so your tool arguments are reachable by whoever wrote that text.
+- Check what your tools can reach, not just what they are for. Ours could reach
+  the session that authorises them.
+- Write the guard, then break it on purpose and confirm it fails. Two of ours
+  did not bite on the first attempt.
+
+## When is this not your problem?
+
+If your server is stdio-only, it has no port and none of this applies. Most of
+the risk arrives with the HTTP transport, which people add for n8n or for a
+remote machine and then forget is listening.
+
+## Trying this one
+
+```bash
+/plugin marketplace add roomi-fields/claude-plugins
+/plugin install notebooklm@roomi-fields
+```
+
+The full model, including what the container requires, is in
+[the security page](/security). Past advisories are listed there too.

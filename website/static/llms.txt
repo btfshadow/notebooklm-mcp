@@ -72,6 +72,21 @@ Response shape:
 - [Migrating from PleasePrompto/notebooklm-mcp](https://notebooklm.roomi-fields.com/compare): that project was archived in September 2026; 17 of its 19 tool names work here unchanged, and this page maps the rest.
 - [Changelog](https://notebooklm.roomi-fields.com/changelog): release history.
 
+## Blog
+
+Field notes on automating NotebookLM. Each post answers one question people
+actually ask, states its limits, and names alternatives fairly.
+
+- [Does NotebookLM have an API?](https://notebooklm.roomi-fields.com/blog/does-notebooklm-have-an-api): Google ships a Gemini Notebook Enterprise API in preview; the consumer product has no developer key and the Podcast API is deprecated.
+- [How to use NotebookLM from Claude Code](https://notebooklm.roomi-fields.com/blog/notebooklm-from-claude-code): install, the separate Google login, and why it must run in a terminal.
+- [NotebookLM usage limits changed](https://notebooklm.roomi-fields.com/blog/notebooklm-usage-limits-automation): compute-based since 2 September 2026, refreshed every 5 hours, no daily count to plan against.
+- [PleasePrompto/notebooklm-mcp is archived](https://notebooklm.roomi-fields.com/blog/notebooklm-mcp-archived-alternative): the alternatives, what moves on migration, and the environment variable that means two different things.
+- [Getting NotebookLM citations as structured JSON](https://notebooklm.roomi-fields.com/blog/notebooklm-citations-as-json): source names versus cited excerpts, and why one costs more than the other.
+- [Generating audio overviews programmatically](https://notebooklm.roomi-fields.com/blog/notebooklm-audio-overviews-programmatically): the official enterprise route, browser automation, and the internal interface.
+- [NotebookLM in n8n, Zapier and Make](https://notebooklm.roomi-fields.com/blog/notebooklm-n8n-zapier-make): no connector exists; the local HTTP endpoint workaround and where it must run.
+- [Running across multiple Google accounts](https://notebooklm.roomi-fields.com/blog/notebooklm-multiple-google-accounts): rotation multiplies a compute budget, not a quota; where sessions live and why they do not travel.
+- [Your MCP server is probably listening on 0.0.0.0](https://notebooklm.roomi-fields.com/blog/mcp-server-listening-on-0-0-0-0): our own advisory, why loopback alone is not enough, and the three controls.
+
 ## Optional
 
 - [GitHub repository](https://github.com/roomi-fields/notebooklm-mcp): source code, issues, releases.

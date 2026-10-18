@@ -1001,7 +1001,7 @@ User: "Yes" → call remove_notebook`,
       description:
         'Switch to a different Google account or re-authenticate. ' +
         'Use this when:\n' +
-        '- NotebookLM rate limit is reached (50 queries/day for free accounts)\n' +
+        '- NotebookLM usage limit is reached (compute-based, refreshes every 5 hours)\n' +
         '- You want to switch to a different Google account\n' +
         '- Authentication is broken and needs a fresh start\n\n' +
         'This will:\n' +
@@ -2219,7 +2219,7 @@ export class ToolHandlers {
         return {
           success: false,
           error:
-            'NotebookLM rate limit reached (50 queries/day for free accounts).\n\n' +
+            'NotebookLM usage limit reached. The allowance is compute-based and refreshes every 5 hours, not daily.\n\n' +
             'Automatic account rotation failed or no other accounts available.\n\n' +
             'You can:\n' +
             "1. Use the 're_auth' tool to login with a different Google account\n" +

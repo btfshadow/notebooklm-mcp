@@ -4,7 +4,20 @@ The NotebookLM MCP server supports multiple Google accounts with automatic rotat
 
 ## Overview
 
-NotebookLM has a **50 queries per day limit** per Google account (free tier). With multi-account support, the server can automatically switch to another account when the limit is reached, giving you up to **150 queries/day** with 3 accounts.
+NotebookLM stopped counting queries on 2 September 2026. Usage is now
+**compute-based**: what a request costs depends on the complexity of the
+prompt, the length of the chat, the number of sources and the features used.
+The allowance **refreshes every 5 hours** until a weekly ceiling is reached,
+and a paid plan multiplies it (2× on AI Plus, 4× on AI Pro, 5× or 20× above
+that). Your real remaining balance is in **Settings → Usage**, and the chat
+tells you when the limit resets. See
+[Manage your Gemini Notebook usage limits](https://support.google.com/gemininotebook/answer/17670842).
+
+This matters for automation: there is no number of questions you can plan
+against. A long conversation over many sources exhausts the allowance faster
+than the same count of short, fresh questions. Multi-account rotation still
+helps — it moves work to another allowance when one runs out — but it
+multiplies a budget, not a quota.
 
 ## Architecture
 
@@ -212,7 +225,7 @@ npm run accounts remove <account-id>
 
 If all accounts hit their daily limit:
 
-1. **Wait** until midnight UTC for quotas to reset
+1. **Wait** for the next 5-hour refresh — there is no midnight reset
 2. **Manually reset** quotas for testing:
    ```bash
    echo '{"used": 0, "limit": 50, ...}' > accounts/account-xxx/quota.json

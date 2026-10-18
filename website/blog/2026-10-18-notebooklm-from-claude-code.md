@@ -1,0 +1,87 @@
+---
+title: 'How to use NotebookLM from Claude Code'
+description: 'Connect your own NotebookLM notebooks to Claude Code as an MCP server, so the agent answers from your documents with citations instead of guessing. Install, login, and the first useful query.'
+slug: notebooklm-from-claude-code
+authors: [romain]
+tags: [notebooklm, claude-code, mcp]
+---
+
+Claude Code is good at reasoning and bad at knowing what is in your PDFs. If
+you have already put those documents into NotebookLM, you can hand the agent a
+way to ask them — and get back answers that name the source and quote the
+passage, instead of a confident paragraph you then have to verify.
+
+Two commands and one login.
+
+{/_ truncate _/}
+
+## What does the agent actually gain?
+
+Grounding, and a way to show its work. A NotebookLM answer comes back with the
+sources it used and the exact passages it drew on. For an agent that matters
+more than for a human reader: the agent can carry the citation into whatever it
+writes next, and you can check it without re-reading the corpus.
+
+It also gains the Studio side — audio overviews, reports, mind maps, study
+aids — which it can trigger and then collect.
+
+## How do you install it?
+
+```bash
+/plugin marketplace add roomi-fields/claude-plugins
+/plugin install notebooklm@roomi-fields
+```
+
+That registers the server and an agent skill that teaches Claude when to reach
+for it. Node 22 or newer.
+
+Then log into Google once, in a terminal rather than through the agent:
+
+```bash
+npx -y -p @roomi-fields/notebooklm-mcp notebooklm-mcp-setup-auth
+```
+
+A visible Chrome opens, you log in, and the session is saved. Run it in a
+terminal because the login can take minutes and an MCP client will time the
+tool call out first.
+
+## Why is the login separate?
+
+NotebookLM has no developer key for personal accounts. Reaching your own
+notebooks means holding your own session, the way your browser does. That
+session lives on your machine, outside the project directory, and it survives
+restarts and days.
+
+It also means the session is worth protecting, which is why the server listens
+on loopback and refuses to bind anywhere else without a token.
+
+## What does a first query look like?
+
+Ask the agent in plain language — "what do my notebooks say about X" — and let
+it pick the notebook. Under the hood it lists your notebooks, asks the
+question, and returns the answer with citations attached.
+
+The one option worth knowing is the citation format. Ask for the machine
+-readable one when the answer feeds something else: you get the source names
+and the cited excerpts as data rather than as footnote markers in prose.
+
+## When is this not the right tool?
+
+- **For code.** NotebookLM reasons over documents, not over a repository. For
+  code, a code-aware index serves the agent far better.
+- **For one quick question about one PDF.** Attaching the file to the
+  conversation is faster than curating a notebook.
+- **For unattended loops that must not stall.** Usage is compute-based and
+  refreshes every 5 hours; a long run can stop mid-way. Plan for it, or cache.
+- **For notebooks shared with you rather than owned by you.** Google refuses
+  Studio generation on those, and no client can work around it.
+
+## Upgrading later
+
+```bash
+/plugin marketplace update roomi-fields
+/reload-plugins
+```
+
+There is no `/plugin update`. Full setup, including Cursor, Codex and the REST
+route, is in [the install guide](/install).

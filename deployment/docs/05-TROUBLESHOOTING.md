@@ -298,14 +298,16 @@ ECONNREFUSED 192.168.1.52:3000
 **Symptoms:**
 
 ```
-Error: NotebookLM rate limit reached (50 queries/day)
+Error: NotebookLM usage limit reached (compute-based, refreshes every 5 hours)
 ```
 
 **Solutions:**
 
-1. Wait 24h (reset midnight PST)
-2. Switch to Google Workspace (higher limit)
-3. Monitor usage: count queries/day
+1. Wait for the next 5-hour refresh — the allowance is compute-based since
+   2 September 2026, not a daily count, and there is no midnight reset
+2. Check the real balance in NotebookLM under **Settings → Usage**
+3. Shorten conversations and narrow the source list — both cost allowance
+4. Upgrade the plan (2× on AI Plus, 4× on AI Pro) or rotate accounts
 
 ---
 

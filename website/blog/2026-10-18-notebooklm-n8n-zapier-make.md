@@ -1,0 +1,83 @@
+---
+title: 'NotebookLM in n8n, Zapier and Make: there is no connector'
+description: 'None of the three has a NotebookLM integration, and Zapier says so on its own page. The workaround is a local HTTP endpoint your workflow calls like any other API.'
+slug: notebooklm-n8n-zapier-make
+authors: [romain]
+tags: [notebooklm, n8n, zapier, automation]
+---
+
+Zapier's NotebookLM page says the integration has not been built. Make has no
+module. n8n has no node. Every walkthrough you find does something adjacent —
+saving files to Drive, which you then add to a notebook by hand.
+
+That is the honest state. What follows is the workaround that actually
+automates the part people want: asking a question and getting a
+citation-backed answer into the workflow.
+
+{/_ truncate _/}
+
+## Why is there no connector?
+
+Because a connector needs an API with a key, and the consumer NotebookLM has
+neither. Google's documented API is the enterprise one, behind a Cloud project
+and an administrator. A connector built on it would serve the subset of users
+who could already script it.
+
+## What does the workaround look like?
+
+Run a small HTTP server on a machine your workflow can reach. It holds your
+Google session and exposes the operations as ordinary endpoints. Your workflow
+then uses the same HTTP node it would use for any other service.
+
+In n8n that is one HTTP Request node: POST the question, read the answer and
+its citations out of the response, pass them to the next step. In Make and
+Zapier it is their generic webhook or HTTP action.
+
+The answer arrives as data, so it can go to a sheet, a Slack message, a
+database row or a document, like anything else in the workflow.
+
+## Where does the server have to run?
+
+Somewhere the workflow engine can reach, which is the real constraint.
+
+Self-hosted n8n on the same machine is the simple case: the server stays on
+loopback and nothing is exposed. Cloud-hosted n8n, Zapier or Make cannot reach
+your laptop, so you need the server on a host they can see — and at that point
+you are exposing an endpoint that holds a live Google session.
+
+If you do that, set a token. Our server refuses to start on a public interface
+without one, which is deliberate: the failure is louder than a leak.
+
+## What is worth automating this way?
+
+The jobs where the answer is one step of several. A weekly digest that asks
+each notebook what changed. A support flow that answers from internal
+documentation with the passage attached. A research pipeline that files each
+answer with its citations into a table.
+
+The pattern that pays best is answer-once-then-store. Usage is a compute
+allowance now, refreshed every five hours, so a workflow that re-asks the same
+question every run is spending for nothing.
+
+## When is this the wrong design?
+
+- **When latency matters.** An answer takes seconds, not milliseconds. Do not
+  put it in front of a user who is waiting.
+- **When the workflow must never stall.** The allowance can run out mid-run.
+- **When you would be exposing the server to the public internet just to reach
+  a cloud workflow tool.** Weigh that against moving the workflow instead.
+- **When a plain Gemini API call would do.** If you do not need grounding in
+  your own documents, you do not need any of this.
+
+## Trying this one
+
+```bash
+git clone https://github.com/roomi-fields/notebooklm-mcp.git
+cd notebooklm-mcp && npm install && npm run build
+npx -y -p @roomi-fields/notebooklm-mcp notebooklm-mcp-setup-auth
+HTTP_PORT=3000 node dist/http-wrapper.js
+```
+
+Node 22 or newer. The worked n8n flow is in
+[the n8n guide](/notebooklm-n8n); the full endpoint list is in
+[the API reference](/notebooklm-rest-api).

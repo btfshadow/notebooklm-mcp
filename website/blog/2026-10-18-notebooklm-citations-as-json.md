@@ -1,0 +1,85 @@
+---
+title: 'Getting NotebookLM citations as structured JSON'
+description: 'NotebookLM shows citations as clickable markers in the web app and exports none of them. How to get the source names and the cited passages back as data an agent can act on.'
+slug: notebooklm-citations-as-json
+authors: [romain]
+tags: [notebooklm, citations]
+---
+
+NotebookLM's best feature is that every claim points at the passage it came
+from. Its worst export story is that those pointers stay in the web app. Copy
+an answer out and you get prose with little numbers in it.
+
+If you are feeding answers to anything downstream — a review, a database, an
+agent that must not invent — the citation is the part you actually need.
+
+{/_ truncate _/}
+
+## What does a citation contain?
+
+Two things worth separating. The **source name** tells you which document a
+claim came from. The **excerpt** is the passage itself, the few sentences the
+model drew on.
+
+The first is cheap to get and almost always enough to audit an answer. The
+second is what lets a downstream reader judge without opening the source, and
+it costs more to obtain.
+
+## How do you get them out?
+
+Ask for a machine-readable citation format when you make the request. Our
+server takes a `source_format` on every question:
+
+| Value       | You get                                  |
+| ----------- | ---------------------------------------- |
+| `none`      | the answer only                          |
+| `inline`    | markers in the prose                     |
+| `footnotes` | markers plus a source list               |
+| `json`      | source names and cited excerpts, as data |
+| `expanded`  | footnotes with the excerpts written out  |
+
+`json` is the one to use when something other than a person reads the result.
+`expanded` is the one for a human report.
+
+## Why is the excerpt harder than the name?
+
+Because of where each lives. Source names sit in the answer's markup and come
+back in one pass. Excerpts are revealed by opening each citation, which means
+asking for each one in turn and collecting what comes back.
+
+That is slower, and it is why the two are separate options rather than one.
+If you only need to know _which_ document answered, do not pay for the rest.
+
+## What do you do with them?
+
+The pattern we keep coming back to: write each answer, with its citations, as
+a document in a store you control — a vault, a table, a search index. Then
+query that store instead of re-asking.
+
+It costs one pass through NotebookLM and nothing thereafter, which matters
+more since usage became a compute allowance rather than a query count. It also
+gives you something NotebookLM does not: a corpus of past answers you can
+search, diff and cite.
+
+We emit those documents against a published schema so the shape does not drift
+between versions.
+
+## When is this not worth it?
+
+- **When you are reading the answers yourself, in the app.** The clickable
+  markers are better than anything you would export.
+- **When the answer is a one-off.** The citation machinery earns its keep over
+  a corpus, not over a question.
+- **When you need page numbers or offsets.** You get the passage and the source
+  name, not a position in the original document.
+
+## Trying this one
+
+```bash
+/plugin marketplace add roomi-fields/claude-plugins
+/plugin install notebooklm@roomi-fields
+```
+
+The request and response shapes are in
+[the API reference](/notebooklm-rest-api); the storage pattern is in
+[the RTFM integration page](/notebooklm-rtfm).

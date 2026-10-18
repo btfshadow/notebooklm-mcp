@@ -1,6 +1,6 @@
 # NotebookLM + RTFM — cache batch outputs as a searchable markdown vault
 
-NotebookLM is brilliant at producing citation-backed answers, but it's slow (~10–30s per query) and rate-limited (50 queries per day per Google account on the free tier). For any workflow that re-asks similar questions over time — academic literature reviews, competitive intelligence pipelines, internal knowledge bases — querying NotebookLM live every time is the wrong architecture.
+NotebookLM is brilliant at producing citation-backed answers, but it's slow (~10–30s per query) and rate-limited (a compute-based allowance per Google account, refreshed every 5 hours). For any workflow that re-asks similar questions over time — academic literature reviews, competitive intelligence pipelines, internal knowledge bases — querying NotebookLM live every time is the wrong architecture.
 
 The pattern that scales: **NotebookLM as a one-shot ingestion layer, [RTFM](https://github.com/roomi-fields/rtfm) as the retrieval layer.** Run an exhaustive question set once, persist every answer (with citations, source titles, and excerpts) as markdown, then point your CLI agent at the vault for unlimited offline queries.
 

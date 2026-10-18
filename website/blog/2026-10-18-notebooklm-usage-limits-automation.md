@@ -1,0 +1,87 @@
+---
+title: 'NotebookLM usage limits changed: what breaks in your automation'
+description: 'Since 2 September 2026 NotebookLM meters compute on a rolling 5-hour window instead of counting 50 chats a day. Every script that planned against a daily quota is now planning against a number that does not exist.'
+slug: notebooklm-usage-limits-automation
+authors: [romain]
+tags: [notebooklm, quotas, automation]
+---
+
+If your script waits until midnight for the quota to reset, it is waiting for
+something that no longer happens. On 2 September 2026 Google replaced
+NotebookLM's fixed daily chat caps with a compute-based allowance that
+refreshes every five hours, up to a weekly ceiling.
+
+Our own documentation said "50 queries per day, resets at midnight UTC" until
+this week. It was wrong, and we had been repeating it for months.
+
+{/_ truncate _/}
+
+## What is actually metered now?
+
+Not requests. Google's own wording is that limits are compute-based and depend
+on "the complexity of your prompt" and "the models and features you use".
+Chat length and the number of sources count too.
+
+The practical consequence: two scripts issuing the same number of questions
+can consume wildly different amounts. A long conversation across forty sources
+is not the same purchase as forty short, fresh questions.
+
+## When does it come back?
+
+Every five hours, on a rolling window, until you hit a weekly ceiling. There is
+no daily reset and no fixed hour to wait for. The remaining balance and the
+reset time are shown in the app under **Settings → Usage**, and in the chat
+when you get close.
+
+Paid plans multiply the allowance rather than changing the mechanism — two
+times on AI Plus, four on AI Pro, more above that.
+
+## What should change in a batch script?
+
+**Stop counting.** A counter that stops at 50 either stops too early or too
+late, and you cannot tell which.
+
+**Prefer short, stateless questions.** Each one costs less than extending a
+conversation that carries its whole history. If you do not need the thread,
+do not open one.
+
+**Narrow the source list.** Asking against the three relevant sources instead
+of the whole notebook is cheaper as well as more accurate.
+
+**Make the run resumable.** The allowance will run out mid-batch sooner or
+later. A run that records each answer as it arrives loses nothing; a run that
+writes at the end loses everything.
+
+**Treat the refusal as a signal, not an error.** When the server reports the
+limit, back off for the window rather than retrying immediately.
+
+## Does rotating accounts still help?
+
+Yes, with a caveat worth being clear about. Rotation moves work onto another
+account's allowance when the first runs out. It multiplies a budget, not a
+quota, and it does nothing about the fact that you can no longer predict how
+far that budget goes.
+
+It is also a per-account login each time, with everything that implies for
+where those sessions live.
+
+## When is NotebookLM the wrong place for the work?
+
+- **When you re-ask the same questions.** Answer once, store the result, query
+  your own store afterwards. Paying the allowance twice for the same answer is
+  the most common waste we see.
+- **When you only need generation, not grounding.** The Gemini API is public
+  and supported, with limits you can plan against.
+- **When the deadline is fixed.** A compute-based allowance with a weekly
+  ceiling is not something to promise a delivery date on.
+
+## Trying this one
+
+```bash
+/plugin marketplace add roomi-fields/claude-plugins
+/plugin install notebooklm@roomi-fields
+```
+
+The batch pattern, including how to cache answers so a re-run costs nothing,
+is in [running a thousand questions](/batch-1000-questions). Account rotation
+is in [multi-account](/notebooklm-multi-account).

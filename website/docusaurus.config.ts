@@ -134,7 +134,22 @@ const config: Config = {
           // sources on freshness has nothing to go on without one.
           showLastUpdateTime: true,
         },
-        blog: false,
+        blog: {
+          routeBasePath: '/blog',
+          blogTitle: 'NotebookLM automation notes',
+          blogDescription:
+            'Field notes on automating Google NotebookLM: what the API can and cannot do, quota behaviour, citations, batching, and running an MCP server safely.',
+          postsPerPage: 10,
+          showReadingTime: true,
+          blogSidebarTitle: 'All posts',
+          blogSidebarCount: 'ALL',
+          onUntruncatedBlogPosts: 'throw',
+          feedOptions: {
+            type: 'all',
+            title: 'NotebookLM automation notes',
+            copyright: `MIT — roomi-fields`,
+          },
+        },
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -179,6 +194,11 @@ const config: Config = {
           sidebarId: 'docs',
           position: 'left',
           label: 'Docs',
+        },
+        {
+          to: '/blog',
+          label: 'Blog',
+          position: 'left',
         },
         {
           to: '/changelog',

@@ -14,7 +14,7 @@
  * Usage:  node scripts/check-schemas.mjs
  */
 
-import { readFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -22,7 +22,16 @@ const websiteRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const buildDir = join(websiteRoot, 'build');
 
 /** Pages that are not documentation and carry no page-level schema. */
-const EXEMPT = new Set(['404.html', 'google423b64df285275ff.html', 'changelog.html']);
+const EXEMPT = new Set([
+  '404.html',
+  'google423b64df285275ff.html',
+  'changelog.html',
+  // The blog index is a listing; its posts are checked below, one by one.
+  'blog.html',
+]);
+
+/** Blog listing pages, which are indexes rather than articles. */
+const BLOG_EXEMPT = new Set(['archive.html', 'authors.html', 'tags.html', 'index.html']);
 
 const REQUIRED = ['url', 'description', 'dateModified', 'publisher', 'isPartOf', 'about'];
 
@@ -41,6 +50,48 @@ function blocks(html) {
 
 const problems = [];
 let checked = 0;
+
+/**
+ * Blog posts are different in kind: Docusaurus emits their BlogPosting, and a
+ * wrapper adds a fragment carrying the same identifier so the post names its
+ * publisher. Both halves must be there — the fragment alone attributes
+ * nothing, and the article alone is unattributed.
+ */
+function checkBlog(file, parsed) {
+  const post = parsed.find((b) => b['@type'] === 'BlogPosting');
+  if (!post) {
+    problems.push(`blog/${file}: no BlogPosting`);
+    return;
+  }
+  const missing = ['url', 'description', 'datePublished', 'author'].filter((k) => !post[k]);
+  if (missing.length) {
+    problems.push(`blog/${file}: BlogPosting is missing ${missing.join(', ')}`);
+    return;
+  }
+  const id = post['@id'] ?? post.url;
+  const attributed = parsed.some((b) => b['@id'] === id && b.publisher);
+  if (!attributed) {
+    problems.push(`blog/${file}: nothing attributes the post to a publisher`);
+    return;
+  }
+  checked += 1;
+}
+
+const blogDir = join(buildDir, 'blog');
+if (existsSync(blogDir)) {
+  for (const file of readdirSync(blogDir).filter((f) => f.endsWith('.html'))) {
+    if (BLOG_EXEMPT.has(file)) continue;
+    const parsed = blocks(readFileSync(join(blogDir, file), 'utf-8'));
+    const broken = parsed.find((b) => b.__unparseable);
+    if (broken) {
+      problems.push(
+        `blog/${file}: a structured-data block does not parse — ${broken.__unparseable}`
+      );
+      continue;
+    }
+    checkBlog(file, parsed);
+  }
+}
 
 for (const file of readdirSync(buildDir).filter((f) => f.endsWith('.html'))) {
   if (EXEMPT.has(file)) continue;

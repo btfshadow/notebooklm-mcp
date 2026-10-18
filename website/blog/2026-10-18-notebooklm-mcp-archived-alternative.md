@@ -1,0 +1,85 @@
+---
+title: 'PleasePrompto/notebooklm-mcp is archived: what to use instead'
+description: 'The most-recommended NotebookLM MCP server is no longer maintained. The alternatives, what moves when you switch, and the one environment variable that means something different everywhere.'
+slug: notebooklm-mcp-archived-alternative
+authors: [romain]
+tags: [notebooklm, mcp, migration]
+---
+
+`PleasePrompto/notebooklm-mcp` is the server most guides still point at. Its
+author archived it, and the package on npm has not moved since. If you
+installed it on the strength of a 2026 tutorial, you are running something
+nobody is fixing.
+
+This is not a dunk. It was good work, it taught the pattern everyone else
+copied, and the author said so plainly rather than letting it rot quietly.
+
+{/_ truncate _/}
+
+## Does an archived server stop working?
+
+Not immediately, and that is the trap. These tools drive interfaces Google
+does not document. They keep working until Google changes something, and then
+they stop — all at once, for everyone.
+
+That happened in mid-2026, when the web app was rebuilt. Every project in this
+space broke the same week. The maintained ones shipped fixes; the others
+stayed broken.
+
+So the question is not whether your install works today. It is who answers
+when it stops.
+
+## What are the alternatives?
+
+Several projects are active, in different shapes:
+
+- **A Python CLI plus MCP server**, with the broadest coverage of the internal
+  interfaces and the most contributors. If you work in Python, start there.
+- **A Node MCP server with a local REST API** — ours. One install serves both
+  an agent and a workflow tool over HTTP.
+- **A separate CLI-first project** with a very large tool surface, which is
+  worth knowing costs an agent context on every turn.
+
+Pick on language, on whether you need HTTP, and on how fast the project
+recovered last time Google moved.
+
+## What moves when you switch from the archived one?
+
+Less than you would expect. Most of its tool names were copied by everyone
+after it, so an agent's habits largely carry over. In our case 17 of its 19
+tool names work unchanged.
+
+Two were renamed, because the thing they did grew: generating an audio
+overview became generating _content_ of several kinds, and downloading audio
+became downloading content.
+
+## The trap worth knowing about
+
+One environment variable has the same name and a different meaning in
+different projects. In the archived server, the transport variable chose
+between the stdio and HTTP ways of talking to the _client_. In ours, it chooses
+between the internal-API and browser ways of talking to _NotebookLM_.
+
+Copy a configuration across without reading it and you will set something
+real, that does something else, silently. Check every variable you carry over
+rather than assuming a shared vocabulary.
+
+## When should you not migrate at all?
+
+- **If your install works and the work is finished.** An archived tool that
+  already produced what you needed owes you nothing.
+- **If you only ever ask one notebook one kind of question.** The web app is
+  right there, and it is better at that than any of us.
+- **If you have an enterprise licence.** Google's own API is supported and
+  nothing here competes with a contract.
+
+## Trying this one
+
+```bash
+/plugin marketplace add roomi-fields/claude-plugins
+/plugin install notebooklm@roomi-fields
+npx -y -p @roomi-fields/notebooklm-mcp notebooklm-mcp-setup-auth
+```
+
+The tool-by-tool mapping, the environment variable table and the full feature
+comparison are on [the migration page](/compare).
