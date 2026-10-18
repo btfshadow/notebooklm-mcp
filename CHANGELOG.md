@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.1.0] - 2026-10-18
+
+### Changed — Node 22 is the floor, and the last four advisories left with it
+
+The declared floor of Node 18 had become fiction: three production
+dependencies — the browser engine, the file globber and the data-directory
+resolver — already required Node 20 or newer. The CI matrix kept passing on
+18 because the tests never exercised them, which made the green tick an
+assurance of nothing.
+
+Node 18 has had no security release since March 2025, and Node 20 reached end
+of life in April 2026, so moving to 20 would have been a migration onto a dead
+version. The matrix now tests 22 and 24; the container moves to 22. Nothing
+breaks for anyone on a supported runtime, and `engines` is a warning rather
+than a gate, so no install is blocked — it simply stops claiming support we no
+longer had.
+
+The reason to do it now: the third-party file globber could go. Its dependency
+chain carried four advisories with no patched version upstream, documented as
+reviewed exceptions in 4.0.0. Node's built-in search replaces it, the
+exception list is empty, and the audit runs clean with no allowances at all.
+
+That search had **no test coverage whatsoever** before this release — the
+suite passed identically with it present or absent. It now has its own tests
+over a real directory tree: wildcard expansion, `**` across levels, the
+file/directory split, and a missing tree returning nothing instead of
+throwing.
+
+Also removed: four type suppressions that Node 22's own typings made
+unnecessary.
+
+---
+
 ## [4.0.0] - 2026-10-18
 
 ### Security — the HTTP API is no longer open to the network or to any web page

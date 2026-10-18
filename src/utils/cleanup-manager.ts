@@ -19,7 +19,33 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { globby } from 'globby';
+import { glob } from 'fs/promises';
+
+/**
+ * Directory/file search over a literal pattern.
+ *
+ * Replaces the third-party globber, whose dependency chain carried four
+ * advisories with no patched version upstream. Node's built-in search covers
+ * everything we ask of it — every pattern here is a string literal, never
+ * caller-supplied.
+ */
+export async function findPaths(
+  pattern: string,
+  opts: { onlyDirectories?: boolean; onlyFiles?: boolean } = {}
+): Promise<string[]> {
+  // Node's matcher reads a backslash as an escape, so Windows paths built with
+  // path.join have to be normalised to forward slashes first.
+  const normalized = pattern.replace(/\\/g, '/');
+  const found: string[] = [];
+
+  for await (const entry of glob(normalized, { withFileTypes: true })) {
+    if (opts.onlyDirectories && !entry.isDirectory()) continue;
+    if (opts.onlyFiles && !entry.isFile()) continue;
+    found.push(path.join(entry.parentPath, entry.name));
+  }
+
+  return found;
+}
 import envPaths from 'env-paths';
 import os from 'os';
 import { log } from './logger.js';
@@ -224,7 +250,7 @@ export class CleanupManager {
 
       // Search for notebooklm-mcp in npx cache
       const pattern = path.join(npxPath, '*/node_modules/notebooklm-mcp');
-      const matches = await globby(pattern, { onlyDirectories: true, absolute: true });
+      const matches = await findPaths(pattern, { onlyDirectories: true });
       found.push(...matches);
     } catch (error) {
       log.warning(`⚠️  Error searching NPM cache: ${error}`);
@@ -253,7 +279,7 @@ export class CleanupManager {
       ];
 
       for (const pattern of patterns) {
-        const matches = await globby(pattern, { onlyDirectories: true, absolute: true });
+        const matches = await findPaths(pattern, { onlyDirectories: true });
         found.push(...matches);
       }
     } catch (error) {
@@ -278,7 +304,7 @@ export class CleanupManager {
 
       // Search for notebooklm-mcp projects
       const pattern = path.join(projectsPath, '*notebooklm-mcp*');
-      const matches = await globby(pattern, { onlyDirectories: true, absolute: true });
+      const matches = await findPaths(pattern, { onlyDirectories: true });
       found.push(...matches);
     } catch (error) {
       log.warning(`⚠️  Error searching Claude projects: ${error}`);
@@ -296,7 +322,7 @@ export class CleanupManager {
     try {
       // Search for notebooklm backup directories in temp
       const pattern = path.join(this.tempDir, 'notebooklm-backup-*');
-      const matches = await globby(pattern, { onlyDirectories: true, absolute: true });
+      const matches = await findPaths(pattern, { onlyDirectories: true });
       found.push(...matches);
     } catch (error) {
       log.warning(`⚠️  Error searching temp backups: ${error}`);
@@ -321,7 +347,7 @@ export class CleanupManager {
 
         // Search for MCP notebooklm logs
         const pattern = path.join(editorPath, '**/exthost/**/*notebooklm*.log');
-        const matches = await globby(pattern, { onlyFiles: true, absolute: true });
+        const matches = await findPaths(pattern, { onlyFiles: true });
         found.push(...matches);
       }
     } catch (error) {
@@ -347,7 +373,7 @@ export class CleanupManager {
       const patterns = [path.join(trashPath, '**/*notebooklm*')];
 
       for (const pattern of patterns) {
-        const matches = await globby(pattern, { absolute: true });
+        const matches = await findPaths(pattern);
         found.push(...matches);
       }
     } catch (error) {

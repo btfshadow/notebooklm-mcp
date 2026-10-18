@@ -50,7 +50,7 @@ node --version
 npm --version
 ```
 
-If you see version numbers (e.g., `v20.9.0` and `10.1.0`), Node.js is installed. ✅
+**Node 22 or newer is required.** If `node --version` shows v22 or above, you are set. ✅
 If not, continue below. ⬇️
 
 ### Download Node.js
@@ -66,7 +66,7 @@ If not, continue below. ⬇️
 5. Restart PowerShell and verify:
 
 ```powershell
-node --version   # Should display: v20.x.x or higher
+node --version   # Should display: v22.x.x or higher
 npm --version    # Should display: 10.x.x or higher
 ```
 

@@ -17,32 +17,10 @@ import { execFileSync } from 'child_process';
  * Remove an entry the moment a patched version exists.
  */
 const REVIEWED = {
-  braces: {
-    advisory: 'GHSA-grv7-fg5c-xmjg',
-    reason:
-      'Stack exhaustion through deeply nested brace patterns. Reached only via globby, ' +
-      'and every pattern we pass is a string literal in cleanup-manager.ts — no caller, ' +
-      'local or remote, supplies one. No patched version exists: the advisory range is *.',
-    reviewBy: '2026-12-31',
-  },
-  micromatch: {
-    advisory: 'GHSA-952p-6rrq-rcjv',
-    reason: 'Same globby chain, same fixed patterns, no patched version.',
-    reviewBy: '2026-12-31',
-  },
-  'fast-glob': {
-    advisory: 'via micromatch',
-    reason: 'Pulled in by globby; vulnerable only through the micromatch path above.',
-    reviewBy: '2026-12-31',
-  },
-  globby: {
-    advisory: 'via fast-glob',
-    reason:
-      "Our own dependency. npm's suggested fix is globby@7, a major downgrade. " +
-      'The permanent fix is dropping globby for the built-in file search, which ' +
-      'requires Node 22 — tracked separately.',
-    reviewBy: '2026-12-31',
-  },
+  // Empty by design. The four file-search advisories that lived here went away
+  // with the globber itself in 4.1.0 — Node 22's built-in search replaced it.
+  // Add an entry only for an advisory with no upstream fix, and say why it
+  // cannot reach us.
 };
 
 const LEVELS = ['info', 'low', 'moderate', 'high', 'critical'];

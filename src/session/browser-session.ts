@@ -552,7 +552,6 @@ export class BrowserSession {
       try {
         await this.page.evaluate((data) => {
           for (const [key, value] of Object.entries(data)) {
-            // @ts-expect-error - sessionStorage exists in browser context
             sessionStorage.setItem(key, value);
           }
         }, sessionData);
