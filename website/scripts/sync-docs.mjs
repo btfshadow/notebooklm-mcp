@@ -11,6 +11,8 @@
  * to the npm consumers of the package.
  */
 
+import { execFileSync } from 'node:child_process';
+
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -266,6 +268,27 @@ const FRONTMATTER = {
   },
 };
 
+/**
+ * The generated pages are gitignored, so Docusaurus finds no history for them
+ * and renders no date at all. An answer engine choosing between two sources
+ * ranks on freshness, so a page with no date loses to one that has one.
+ *
+ * Carry the date of the last commit that touched the *source* file instead,
+ * which is the date the page's content actually changed.
+ */
+function lastCommitDate(file) {
+  try {
+    const iso = execFileSync('git', ['log', '-1', '--format=%cI', '--', file], {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    }).trim();
+    if (iso) return iso;
+  } catch {
+    // no git, or a shallow clone with no commit touching this file
+  }
+  return null;
+}
+
 function renderFrontmatter(meta) {
   const lines = ['---'];
   for (const [key, value] of Object.entries(meta)) {
@@ -273,6 +296,9 @@ function renderFrontmatter(meta) {
       lines.push(`${key}: [${value.map((v) => JSON.stringify(v)).join(', ')}]`);
     } else if (typeof value === 'string') {
       lines.push(`${key}: ${JSON.stringify(value)}`);
+    } else if (value && typeof value === 'object') {
+      lines.push(`${key}:`);
+      for (const [k, v] of Object.entries(value)) lines.push(`  ${k}: ${JSON.stringify(v)}`);
     } else {
       lines.push(`${key}: ${value}`);
     }
@@ -291,7 +317,10 @@ for (const file of readdirSync(sourceDir)) {
   const src = resolve(sourceDir, file);
   const dst = resolve(targetDir, file);
   const body = readFileSync(src, 'utf-8');
-  const fm = FRONTMATTER[file] ? renderFrontmatter(FRONTMATTER[file]) : '';
+  const meta = { ...(FRONTMATTER[file] ?? {}) };
+  const date = lastCommitDate(src);
+  if (date) meta.last_update = { date };
+  const fm = Object.keys(meta).length ? renderFrontmatter(meta) : '';
   writeFileSync(dst, fm + body, 'utf-8');
   console.log(`  ${file}`);
 }
@@ -300,6 +329,7 @@ for (const file of readdirSync(sourceDir)) {
 {
   const changelogSrc = resolve(repoRoot, 'CHANGELOG.md');
   const changelogDst = resolve(targetDir, 'CHANGELOG.md');
+  const changelogDate = lastCommitDate(changelogSrc);
   const fm = renderFrontmatter({
     title: 'Release history and per-version changelog',
     description:
@@ -307,6 +337,7 @@ for (const file of readdirSync(sourceDir)) {
     keywords: ['notebooklm mcp changelog', 'notebooklm release history', 'notebooklm mcp versions'],
     sidebar_position: 99,
     slug: '/changelog',
+    ...(changelogDate ? { last_update: { date: changelogDate } } : {}),
   });
   let body = readFileSync(changelogSrc, 'utf-8');
   body = body.replace(/^#\s+Changelog\s*\n+/, '');
