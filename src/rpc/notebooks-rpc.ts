@@ -18,6 +18,18 @@ function notebookUrl(id: string): string {
   return `https://${NOTEBOOK_PRIMARY_HOST}/notebook/${id}`;
 }
 
+/** A question NotebookLM suggests asking, with the prompt it would send. */
+export interface SuggestedTopic {
+  question: string;
+  prompt: string;
+}
+
+/** A notebook's own summary of its sources, plus the questions it suggests. */
+export interface NotebookSummary {
+  summary: string;
+  suggestedTopics: SuggestedTopic[];
+}
+
 export class NotebookRpc {
   constructor(private readonly client: BatchExecuteClient) {}
 
@@ -92,6 +104,41 @@ export class NotebookRpc {
   /** Source ids of a notebook (needed to scope a query). */
   async getSourceIds(notebookId: string): Promise<string[]> {
     return (await this.getSources(notebookId)).map((s) => s.id);
+  }
+
+  /**
+   * The notebook's own summary of its sources and the questions it suggests —
+   * what the NotebookLM home card shows, which nothing here exposed before.
+   *
+   * Envelope positions read from teng-lin/notebooklm-py (MIT,
+   * `_web/notebooks.py::get_summary`): the record sits at `result[0]`, the
+   * summary text at `[0][0]`, the suggested question/prompt pairs at `[1][0]`.
+   */
+  async getSummary(notebookId: string): Promise<NotebookSummary> {
+    const result = (await this.client.call(
+      'GET_SUMMARY',
+      [notebookId, [2]],
+      `/notebook/${notebookId}`
+    )) as unknown;
+
+    const record = Array.isArray(result) ? result[0] : undefined;
+    if (!Array.isArray(record)) return { summary: '', suggestedTopics: [] };
+
+    const summaryBlock = record[0];
+    const summary =
+      Array.isArray(summaryBlock) && typeof summaryBlock[0] === 'string' ? summaryBlock[0] : '';
+
+    const topicBlock = record[1];
+    const rows = Array.isArray(topicBlock) && Array.isArray(topicBlock[0]) ? topicBlock[0] : [];
+    const suggestedTopics: SuggestedTopic[] = [];
+    for (const row of rows) {
+      if (!Array.isArray(row) || typeof row[0] !== 'string') continue;
+      suggestedTopics.push({
+        question: row[0],
+        prompt: typeof row[1] === 'string' ? row[1] : row[0],
+      });
+    }
+    return { summary, suggestedTopics };
   }
 
   /** Delete a single notebook by id. */

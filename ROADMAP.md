@@ -2,7 +2,7 @@
 
 This document tracks planned features, recent implementations, and future ideas for the NotebookLM MCP Server.
 
-## Current Version: v4.2.0
+## Current Version: v4.3.0
 
 ---
 
@@ -17,19 +17,11 @@ Sources for the imported items: a read of `teng-lin/notebooklm-py` v0.8.5
 Both are MIT-ish prior art for protocol facts only — we write our own
 implementation and cite the source in the code, per `.claude/CLAUDE.md`.
 
-### Next — tools for RPCs we already implement
+### Next — the one row the previous batch could not ship
 
-Zero protocol work: the ids are in `src/rpc/rpc-ids.ts` and nothing exposes them.
-
-| Tool                                        | RPC id                                        |
-| ------------------------------------------- | --------------------------------------------- |
-| Rename a source                             | `RENAME_SOURCE`                               |
-| List stale Drive sources and re-sync them   | `CHECK_SOURCE_FRESHNESS`, `SYNC_DRIVE_SOURCE` |
-| Notebook summary and per-source guide       | `GET_SUMMARY`, `GET_SOURCE_GUIDE`             |
-| List / read / export chat conversations     | `GET_CONVERSATIONS`, `GET_CONVERSATION_TURNS` |
-| Clear chat history                          | `DELETE_CHAT_HISTORY`                         |
-| Revise one slide of a deck                  | `REVISE_SLIDE_DECK`                           |
-| Export an artifact to Google Docs or Sheets | `EXPORT_ARTIFACT`                             |
+| Tool                   | RPC id                       | Why it is still here                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Re-sync a stale source | `SYNC_DRIVE_SOURCE` (FLmJqe) | The singular refresh is rejected by the server — `teng-lin/notebooklm-py` records INVALID_ARGUMENT for every shape tried, on an account where the plural `dtT1F` accepts the same id. Exposing it would ship a tool that always fails, so `check_source_freshness` tells you a source is stale and the resync waits for the plural payload to be documented. |
 
 ### Then — new capabilities, highest value first
 
@@ -48,7 +40,7 @@ Zero protocol work: the ids are in `src/rpc/rpc-ids.ts` and nothing exposes them
 | Notebook collections                              | label ids with discriminator 3 |                                                                                                                                                |
 | Synchronous source discovery (~10 results)        | `Es3dTe`                       |                                                                                                                                                |
 | Remove from "recently viewed"                     | `fejl7e`                       | Sometimes answers `[13]`; treat as success.                                                                                                    |
-| Tool groups, to cut the context an agent pays for | —                              | Competitor exposes 53 tools and lets callers disable groups. We expose 40 with no filter.                                                      |
+| Tool groups, to cut the context an agent pays for | —                              | Competitor exposes 53 tools and lets callers disable groups. We expose 48 with no filter.                                                      |
 
 ### Onboarding — the conversion half of being found
 
@@ -128,6 +120,26 @@ Verified dead or no-op upstream — knowing this is worth as much as the rest.
 ---
 
 ## Recently Implemented
+
+### Unreleased - 8 tools for RPCs that were already implemented
+
+Eight method ids sat in the table since v3 with nothing exposing them. The
+protocol details came from reading `teng-lin/notebooklm-py` (MIT) rather than
+from capturing traffic.
+
+- [x] `rename_source` — rename one source in place
+- [x] `check_source_freshness` — have URL / Drive sources drifted? whole notebook by default
+- [x] `get_source_guide` — NotebookLM's own summary and key topics for one source
+- [x] `get_notebook_summary` — the notebook's summary plus the questions it suggests
+- [x] `get_chat_history` — read back the recorded questions and answers, newest first
+- [x] `delete_chat_history` — the web UI's "Delete history"
+- [x] `export_artifact` — export a finished artifact to Google Docs or Sheets
+- [x] `revise_slide` — revise one slide instead of regenerating the deck
+
+Two things the backlog had wrong, found by reading before writing: there is no
+way to _list_ conversations (the server returns only the most recent id, and
+ignores the limit it accepts), and there is no per-turn delete. The tools are
+named for what the service does, not for what the entry hoped.
 
 ### v4.2.0 - Caller-supplied file paths are confined
 

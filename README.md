@@ -2,9 +2,9 @@
 
 # NotebookLM REST API + MCP server
 
-**Automate Google NotebookLM at scale. 45-endpoint HTTP REST API for n8n / Zapier / Make / curl, plus an MCP server for Claude Code / Cursor / Codex. Citation-backed Q&A, full Studio generation (audio · video · infographic · report · presentation · data table), multi-account rotation with auto-reauth across personal and Google Workspace accounts.**
+**Automate Google NotebookLM at scale. 53-endpoint HTTP REST API for n8n / Zapier / Make / curl, plus an MCP server for Claude Code / Cursor / Codex. Citation-backed Q&A, full Studio generation (audio · video · infographic · report · presentation · data table), multi-account rotation with auto-reauth across personal and Google Workspace accounts.**
 
-> v4.2.0 — **Node 22 is now the floor, and the last four open advisories are gone with it.** The declared floor of Node 18 had quietly become fiction: three production dependencies already required Node 20 or newer, and the test matrix kept passing on 18 without exercising them. Raising it also let the third-party file globber go — its dependency chain carried four advisories with no fix upstream — replaced by Node's built-in search, now actually under test. Builds on **4.0.0**, where the HTTP API stopped being open to the network and to any web page ([GHSA-p69m-c5rf-g2c3](https://github.com/roomi-fields/notebooklm-mcp/security/advisories/GHSA-p69m-c5rf-g2c3)): it binds loopback, refuses unlisted origins, and takes a bearer token — **remote access and Docker require `NOTEBOOKLM_API_KEY`**, see [Securing the HTTP API](./deployment/docs/15-SECURITY.md). Built on a **dual transport** — the internal `batchexecute` RPC API (10-100× faster than scraping, immune to UI rebrands) with the Playwright browser as an automatic fallback. See the [changelog](./CHANGELOG.md).
+> v4.3.0 — **Node 22 is now the floor, and the last four open advisories are gone with it.** The declared floor of Node 18 had quietly become fiction: three production dependencies already required Node 20 or newer, and the test matrix kept passing on 18 without exercising them. Raising it also let the third-party file globber go — its dependency chain carried four advisories with no fix upstream — replaced by Node's built-in search, now actually under test. Builds on **4.0.0**, where the HTTP API stopped being open to the network and to any web page ([GHSA-p69m-c5rf-g2c3](https://github.com/roomi-fields/notebooklm-mcp/security/advisories/GHSA-p69m-c5rf-g2c3)): it binds loopback, refuses unlisted origins, and takes a bearer token — **remote access and Docker require `NOTEBOOKLM_API_KEY`**, see [Securing the HTTP API](./deployment/docs/15-SECURITY.md). Built on a **dual transport** — the internal `batchexecute` RPC API (10-100× faster than scraping, immune to UI rebrands) with the Playwright browser as an automatic fallback. See the [changelog](./CHANGELOG.md).
 
 > **Note (July 2026):** Google rebranded **NotebookLM** to **Gemini Notebook**. It is the same product, existing links redirect, and this project drives the same underlying service — the browser path was updated for the new DOM in v2.3.0 and the RPC path in v3.0.0. Package and repository keep the `notebooklm` name.
 
@@ -35,7 +35,7 @@
 
 ## What You Can Build
 
-🔗 **No-code automation pipelines** — The 45-endpoint REST API means NotebookLM becomes a step in n8n, Zapier, Make, or a plain `curl` in cron. No agent, no MCP client, no Node in your stack — just HTTP. This is the half most NotebookLM libraries don't have.
+🔗 **No-code automation pipelines** — The 53-endpoint REST API means NotebookLM becomes a step in n8n, Zapier, Make, or a plain `curl` in cron. No agent, no MCP client, no Node in your stack — just HTTP. This is the half most NotebookLM libraries don't have.
 
 🤖 **Agent tooling** — The same engine over MCP for Claude Code, Cursor and Codex, with a bundled skill that primes the agent on citation formats, the daily-quota-aware batch pattern, and transport selection.
 
@@ -129,7 +129,21 @@ Flashcards and quizzes are generated via `generate_study_aid`; mind maps via `ge
 
 - **Add sources**: Files (PDF, TXT, DOCX), URLs, Text, YouTube videos, Google Drive
 - **List sources**: Every source with its ID and title (`source_list`)
+- **Rename a source** (`rename_source`): fix a title in place, by id or by name
+- **Check freshness** (`check_source_freshness`): which URL / Drive sources have drifted from what they point at — the whole notebook in one call. An unanswered source is reported as unknown, never as current
+- **Read a source's guide** (`get_source_guide`): NotebookLM's own summary and key topics for one source
 - **Read a source in full** (`source_read`): the exact text NotebookLM indexed — what it actually reasons over, which the web UI only shows in fragments. Quote a source verbatim, check what a PDF really yielded, or hand the raw material to another tool. Name the source instead of its ID if you prefer; an ambiguous name is refused rather than guessed. Long sources arrive **one page at a time**, with an explicit instruction for fetching the next — or `paginate: false` for the whole document at once.
+
+### Notebook Summary and Chat History
+
+- **What is in this notebook?** (`get_notebook_summary`) — NotebookLM's own summary of its sources plus the questions it suggests asking, without spending a question to find out
+- **What was already asked?** (`get_chat_history`) — read back the recorded questions and answers, newest first. An agent resuming work stops paying to ask what it already asked. NotebookLM exposes only the most recent conversation per notebook
+- **Clear the history** (`delete_chat_history`) — the web UI's "Delete history". There is no per-turn delete: the whole conversation goes
+
+### Artifact Export and Revision
+
+- **Export to Drive** (`export_artifact`) — send a finished artifact to Google Docs or Google Sheets
+- **Revise one slide** (`revise_slide`) — change a single slide from a prompt instead of regenerating the whole deck
 
 ### Notebook Library
 
@@ -247,7 +261,7 @@ Full docs site: **<https://notebooklm.roomi-fields.com/>** · [OpenAPI 3.1 spec]
 | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | [Installation](./deployment/docs/01-INSTALL.md)                                              | Step-by-step setup for HTTP and MCP modes                                                                                         |
 | [Configuration](./deployment/docs/02-CONFIGURATION.md)                                       | Environment variables and security                                                                                                |
-| [REST API reference](./deployment/docs/03-API.md)                                            | Complete HTTP endpoint documentation (45 endpoints)                                                                               |
+| [REST API reference](./deployment/docs/03-API.md)                                            | Complete HTTP endpoint documentation (53 endpoints)                                                                               |
 | [Run 1 000 questions overnight](./deployment/docs/12-BATCH-1000.md)                          | Production batch pattern with auto-reauth and rotation                                                                            |
 | [**RTFM integration — cache as searchable vault**](./deployment/docs/14-RTFM-INTEGRATION.md) | Pipeline pattern: NotebookLM as one-shot ingestion, RTFM as retrieval layer. `/batch-to-vault` endpoint, `nblm-answer-v1` schema. |
 | [n8n integration](./deployment/docs/04-N8N-INTEGRATION.md)                                   | Workflow automation setup                                                                                                         |

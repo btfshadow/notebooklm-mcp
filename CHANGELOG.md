@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.3.0] - 2026-10-22
+
+### Eight tools for calls the server already knew how to make
+
+Eight method ids had sat in the RPC table since v3 with nothing exposing them.
+The protocol details came from reading `teng-lin/notebooklm-py` (MIT) rather
+than from capturing traffic.
+
+| Tool                     | What it answers                                                |
+| ------------------------ | -------------------------------------------------------------- |
+| `get_chat_history`       | What was already asked in this notebook, newest first          |
+| `delete_chat_history`    | Clear it — the web UI's "Delete history"                       |
+| `get_notebook_summary`   | What is in this notebook, and what it suggests asking          |
+| `get_source_guide`       | NotebookLM's own summary and key topics for one source         |
+| `check_source_freshness` | Which URL / Drive sources have drifted from what they point at |
+| `rename_source`          | Fix a source title in place                                    |
+| `export_artifact`        | Send a finished artifact to Google Docs or Sheets              |
+| `revise_slide`           | Change one slide instead of regenerating the deck              |
+
+The matching REST endpoints take the server from 45 to 53. Reading history
+back matters most for agents: one resuming work could not see its own earlier
+answers, so it paid to ask them again.
+
+### Two things the backlog had wrong
+
+Reading the reference before writing the code corrected the plan twice:
+
+- **There is no way to list conversations.** The call returns the most recent
+  conversation id and ignores the limit it accepts. The tool is named for that
+  rather than for the listing the backlog assumed.
+- **There is no per-turn delete.** Clearing history removes the whole
+  conversation.
+
+A third entry — re-syncing a stale source — was dropped rather than shipped:
+the singular refresh call is rejected by the server for every payload shape
+the reference tried. `check_source_freshness` reports the drift; the resync
+waits for a payload we can verify instead of a tool that always fails.
+
+### Fixed
+
+- `check_source_freshness` reports `stale: null` for a reply it does not
+  recognise. A confident "current" for an unparsed answer is the failure that
+  makes a caller skip the refresh it needed.
+- The source-by-name resolver is now one implementation shared by every tool
+  that accepts `source_name`, instead of a copy inside `read_source`.
+- `npm run facts:sync` now also guards the **tool count** in the comparison
+  table and the roadmap, not just the endpoint count.
+
+---
+
 ## [4.2.0] - 2026-10-18
 
 ### Security — the session store is no longer reachable through a file path

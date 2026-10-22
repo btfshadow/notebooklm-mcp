@@ -671,6 +671,91 @@ class NotebookLMMCPServer {
             );
             break;
 
+          case 'rename_source':
+            result = await this.toolHandlers.handleRenameSource(
+              args as {
+                notebook_url?: string;
+                notebook_id?: string;
+                source_id?: string;
+                source_name?: string;
+                title: string;
+              }
+            );
+            break;
+
+          case 'check_source_freshness':
+            result = await this.toolHandlers.handleSourceFreshness(
+              args as {
+                notebook_url?: string;
+                notebook_id?: string;
+                source_id?: string;
+                source_name?: string;
+              }
+            );
+            break;
+
+          case 'get_source_guide':
+            result = await this.toolHandlers.handleSourceGuide(
+              args as {
+                notebook_url?: string;
+                notebook_id?: string;
+                source_id?: string;
+                source_name?: string;
+              }
+            );
+            break;
+
+          case 'get_notebook_summary':
+            result = await this.toolHandlers.handleNotebookSummary(
+              args as { notebook_url?: string; notebook_id?: string }
+            );
+            break;
+
+          case 'get_chat_history':
+            result = await this.toolHandlers.handleChatHistory(
+              args as {
+                notebook_url?: string;
+                notebook_id?: string;
+                conversation_id?: string;
+                limit?: number;
+              }
+            );
+            break;
+
+          case 'delete_chat_history':
+            result = await this.toolHandlers.handleDeleteChatHistory(
+              args as {
+                notebook_url?: string;
+                notebook_id?: string;
+                conversation_id?: string;
+              }
+            );
+            break;
+
+          case 'export_artifact':
+            result = await this.toolHandlers.handleExportArtifact(
+              args as {
+                notebook_url?: string;
+                notebook_id?: string;
+                artifact_id: string;
+                target?: 'docs' | 'sheets';
+                title?: string;
+              }
+            );
+            break;
+
+          case 'revise_slide':
+            result = await this.toolHandlers.handleReviseSlide(
+              args as {
+                notebook_url?: string;
+                notebook_id?: string;
+                artifact_id: string;
+                slide_index: number;
+                prompt: string;
+              }
+            );
+            break;
+
           case 'share_notebook':
             result = await this.toolHandlers.handleNotebookSharing(
               args as { notebook_url?: string; notebook_id?: string; set_public?: boolean }

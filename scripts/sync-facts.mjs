@@ -57,6 +57,14 @@ const TARGETS = [
     ],
   },
   {
+    path: 'deployment/docs/13-COMPARE.md',
+    rules: [[/all \d+ tools are exposed/g, `all ${TOOLS} tools are exposed`]],
+  },
+  {
+    path: 'ROADMAP.md',
+    rules: [[/We expose \d+ with no filter/g, `We expose ${TOOLS} with no filter`]],
+  },
+  {
     // The skill ships twice (bundled here, standalone repo for discovery);
     // `skill:check` then forces the standalone copy to follow.
     path: 'skills/notebooklm/references/rest-api.md',

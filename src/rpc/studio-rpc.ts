@@ -40,6 +40,16 @@ export interface StudioArtifact {
   textContent?: string;
 }
 
+/** Where an artifact export lands. */
+export type ExportTarget = 'docs' | 'sheets';
+
+export interface ExportResult {
+  artifactId: string;
+  target: ExportTarget;
+  /** The created document, or `null` when the reply carried no Drive link. */
+  documentUrl: string | null;
+}
+
 export interface GenerateResult {
   artifactId: string | null;
   status: string;
@@ -155,6 +165,55 @@ export class StudioRpc {
     await this.client.call('DELETE_STUDIO', [[2], artifactId], `/notebook/${notebookId}`);
   }
 
+  /**
+   * Export a finished artifact to Google Docs or Sheets.
+   *
+   * Payload from teng-lin/notebooklm-py (MIT, `_web/artifacts.py::_send_export`):
+   * `[null, artifactId, content, title, type]` with 1 = Docs, 2 = Sheets. The
+   * reply carries the new document somewhere inside a positional envelope that
+   * no reference documents, so we search it for the Drive link rather than
+   * index into a slot we have not seen — and report `null` when there is none,
+   * instead of handing back a URL we invented.
+   */
+  async exportArtifact(
+    notebookId: string,
+    artifactId: string,
+    target: ExportTarget,
+    title: string
+  ): Promise<ExportResult> {
+    const result = (await this.client.call(
+      'EXPORT_ARTIFACT',
+      [null, artifactId, null, title, target === 'sheets' ? 2 : 1],
+      `/notebook/${notebookId}`
+    )) as unknown;
+    return { artifactId, target, documentUrl: findDriveUrl(result) };
+  }
+
+  /**
+   * Revise one slide of an existing slide deck from a prompt.
+   *
+   * `slideIndex` is zero-based. The call is an async kickoff like generation:
+   * it returns the deck's new status, and the revised slide appears on a later
+   * poll. Payload from the same MIT reference (`build_revise_slide_params`).
+   */
+  async reviseSlide(
+    notebookId: string,
+    artifactId: string,
+    slideIndex: number,
+    prompt: string
+  ): Promise<{ artifactId: string; status: StudioArtifact['status'] }> {
+    if (!Number.isInteger(slideIndex) || slideIndex < 0) {
+      throw new Error(`slide_index must be a non-negative integer, got ${slideIndex}`);
+    }
+    const result = (await this.client.call(
+      'REVISE_SLIDE_DECK',
+      [[2], artifactId, [[[slideIndex, prompt]]]],
+      `/notebook/${notebookId}`
+    )) as unknown;
+    const row = Array.isArray(result) ? (result[0] as unknown) : undefined;
+    return { artifactId, status: normalizeStatus(row) };
+  }
+
   /** Poll all Studio artifacts (id, type, status, title, media/text when ready). */
   async poll(notebookId: string): Promise<StudioArtifact[]> {
     const params = [[2], notebookId, 'NOT artifact.status = "ARTIFACT_STATUS_SUGGESTED"'];
@@ -220,6 +279,19 @@ export class StudioRpc {
     }
     return { artifactId, status: 'timeout' };
   }
+}
+
+/** First Google Drive link anywhere in a positional envelope, or `null`. */
+function findDriveUrl(node: unknown, depth = 0): string | null {
+  if (typeof node === 'string') {
+    return /^https:\/\/docs\.google\.com\//.test(node) ? node : null;
+  }
+  if (!Array.isArray(node) || depth > 20) return null;
+  for (const child of node) {
+    const found = findDriveUrl(child, depth + 1);
+    if (found) return found;
+  }
+  return null;
 }
 
 /** Status code at artifact[4]: 1=in_progress, 3=completed, 4=failed; audio 2+media=completed. */

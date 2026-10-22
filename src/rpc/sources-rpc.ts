@@ -21,6 +21,20 @@ export interface SourceFulltext {
   charCount: number;
 }
 
+/** Whether a URL / Drive source has drifted from what it points at. */
+export interface SourceFreshness {
+  id: string;
+  /** `true` = needs a resync, `false` = current, `null` = the server did not say. */
+  stale: boolean | null;
+}
+
+/** NotebookLM's own summary of a single source. */
+export interface SourceGuide {
+  id: string;
+  summary: string;
+  keyTopics: string[];
+}
+
 /**
  * Flatten a document tree to its text leaves, in traversal order.
  *
@@ -146,6 +160,77 @@ export class SourcesRpc {
     }
     if (!content) return null;
     return { id: sourceId, title, content, charCount: content.length };
+  }
+
+  /**
+   * Rename a source.
+   *
+   * Payload shape read from teng-lin/notebooklm-py (MIT,
+   * `_web/sources/__init__.py::rename`): nothing at 0, the id single-nested at
+   * 1, the new title triple-nested at 2. Our implementation is our own.
+   */
+  async renameSource(notebookId: string, sourceId: string, newTitle: string): Promise<void> {
+    await this.client.call(
+      'RENAME_SOURCE',
+      [null, [sourceId], [[[newTitle]]]],
+      `/notebook/${notebookId}`
+    );
+  }
+
+  /**
+   * Is a URL / Drive source still in step with what it points at?
+   *
+   * The reply shape depends on the source type (same MIT reference,
+   * `check_freshness`): an empty array for a URL source that is current, a
+   * `[[null, boolean, [id]]]` row for a Drive source, and a bare boolean on
+   * older accounts. Anything else leaves `stale` at `null` — we report "not
+   * known" rather than guessing fresh, because a wrong "fresh" is the answer
+   * that makes a caller skip the resync it needed.
+   */
+  async checkFreshness(notebookId: string, sourceId: string): Promise<SourceFreshness> {
+    const result = (await this.client.call(
+      'CHECK_SOURCE_FRESHNESS',
+      [null, [sourceId], [2]],
+      `/notebook/${notebookId}`
+    )) as unknown;
+
+    if (Array.isArray(result) && result.length === 0) return { id: sourceId, stale: false };
+    if (typeof result === 'boolean') return { id: sourceId, stale: !result };
+    const row = Array.isArray(result) ? result[0] : undefined;
+    if (Array.isArray(row) && typeof row[1] === 'boolean') {
+      return { id: sourceId, stale: !row[1] };
+    }
+    return { id: sourceId, stale: null };
+  }
+
+  /**
+   * The per-source guide: NotebookLM's own summary of one source plus the key
+   * topics it pulled out. Positions from the same MIT reference
+   * (`_web/rows/sources.py::SourceGuideRow`): the record is at `result[0][0]`,
+   * the summary at `[1][0]`, the topics at `[2][0]`. A source NotebookLM has
+   * not summarised yet legitimately answers with neither.
+   */
+  async getSourceGuide(notebookId: string, sourceId: string): Promise<SourceGuide> {
+    const result = (await this.client.call(
+      'GET_SOURCE_GUIDE',
+      [[[[sourceId]]]],
+      `/notebook/${notebookId}`
+    )) as unknown;
+
+    const outer = Array.isArray(result) ? result[0] : undefined;
+    const inner = Array.isArray(outer) ? outer[0] : undefined;
+    if (!Array.isArray(inner)) return { id: sourceId, summary: '', keyTopics: [] };
+
+    const summaryBlock = inner[1];
+    const summary =
+      Array.isArray(summaryBlock) && typeof summaryBlock[0] === 'string' ? summaryBlock[0] : '';
+
+    const topicBlock = inner[2];
+    const rawTopics =
+      Array.isArray(topicBlock) && Array.isArray(topicBlock[0]) ? topicBlock[0] : [];
+    const keyTopics = rawTopics.filter((t): t is string => typeof t === 'string');
+
+    return { id: sourceId, summary, keyTopics };
   }
 
   /** Delete a source from a notebook. */

@@ -777,6 +777,68 @@ app.post('/notebooks/:id/labels', async (req: Request, res: Response) => {
   }
 });
 
+// A notebook's own summary of its sources + the questions it suggests — RPC extension.
+app.get('/notebooks/:id/summary', async (req: Request, res: Response) => {
+  try {
+    res.json(await toolHandlers.handleNotebookSummary({ notebook_id: req.params.id }));
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// Have the notebook's URL / Drive sources drifted? `?source_id=` narrows to one.
+app.get('/notebooks/:id/freshness', async (req: Request, res: Response) => {
+  try {
+    const sourceId = typeof req.query.source_id === 'string' ? req.query.source_id : undefined;
+    res.json(
+      await toolHandlers.handleSourceFreshness({ notebook_id: req.params.id, source_id: sourceId })
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// Read back the recorded questions and answers, newest first.
+// `?conversation_id=` picks one, `?limit=` caps the turns.
+app.get('/notebooks/:id/chat', async (req: Request, res: Response) => {
+  try {
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+    res.json(
+      await toolHandlers.handleChatHistory({
+        notebook_id: req.params.id,
+        conversation_id:
+          typeof req.query.conversation_id === 'string' ? req.query.conversation_id : undefined,
+        limit,
+      })
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// Clear the chat history. NotebookLM deletes whole conversations, never one turn.
+app.delete('/notebooks/:id/chat', async (req: Request, res: Response) => {
+  try {
+    res.json(
+      await toolHandlers.handleDeleteChatHistory({
+        notebook_id: req.params.id,
+        conversation_id:
+          typeof req.query.conversation_id === 'string' ? req.query.conversation_id : undefined,
+      })
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 // List a notebook's sources with their IDs — RPC extension.
 app.get('/notebooks/:id/sources', async (req: Request, res: Response) => {
   try {
@@ -812,6 +874,43 @@ app.get('/notebooks/:id/sources/:sourceId', async (req: Request, res: Response) 
 });
 
 // List sessions
+// Rename one source in place — RPC extension. Body: { title }
+app.patch('/notebooks/:id/sources/:sourceId', async (req: Request, res: Response) => {
+  try {
+    const title = req.body?.title;
+    if (typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ success: false, error: 'Missing required field: title' });
+    }
+    res.json(
+      await toolHandlers.handleRenameSource({
+        notebook_id: req.params.id,
+        source_id: req.params.sourceId,
+        title,
+      })
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// NotebookLM's own summary and key topics for one source — RPC extension.
+app.get('/notebooks/:id/sources/:sourceId/guide', async (req: Request, res: Response) => {
+  try {
+    res.json(
+      await toolHandlers.handleSourceGuide({
+        notebook_id: req.params.id,
+        source_id: req.params.sourceId,
+      })
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
 app.get('/sessions', async (_req: Request, res: Response) => {
   try {
     const result = await toolHandlers.handleListSessions();
@@ -1320,6 +1419,53 @@ app.post('/content/notes/:noteTitle/to-source', async (req: Request, res: Respon
       success: false,
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+});
+
+// Export a finished artifact to Google Docs or Sheets — RPC extension.
+// Body: { notebook_id | notebook_url, target?: 'docs' | 'sheets', title? }
+app.post('/content/:artifactId/export', async (req: Request, res: Response) => {
+  try {
+    const { notebook_id, notebook_url, target, title } = req.body || {};
+    res.json(
+      await toolHandlers.handleExportArtifact({
+        notebook_id,
+        notebook_url,
+        artifact_id: req.params.artifactId,
+        target,
+        title,
+      })
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
+  }
+});
+
+// Revise one slide of an existing deck — RPC extension.
+// Body: { notebook_id | notebook_url, slide_index, prompt }
+app.post('/content/:artifactId/revise-slide', async (req: Request, res: Response) => {
+  try {
+    const { notebook_id, notebook_url, slide_index, prompt } = req.body || {};
+    if (typeof slide_index !== 'number' || typeof prompt !== 'string') {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Missing required fields: slide_index, prompt' });
+    }
+    res.json(
+      await toolHandlers.handleReviseSlide({
+        notebook_id,
+        notebook_url,
+        artifact_id: req.params.artifactId,
+        slide_index,
+        prompt,
+      })
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ success: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 

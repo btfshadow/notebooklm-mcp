@@ -59,11 +59,22 @@ import { randomDelay } from '../utils/stealth-utils.js';
 import { confinePath, downloadRoots } from '../utils/safe-paths.js';
 import type { Page } from 'patchright';
 import { BatchExecuteClient } from '../rpc/batchexecute.js';
-import { NotebookRpc } from '../rpc/notebooks-rpc.js';
-import { SourcesRpc, type RpcSource } from '../rpc/sources-rpc.js';
+import { NotebookRpc, type NotebookSummary } from '../rpc/notebooks-rpc.js';
+import {
+  SourcesRpc,
+  type RpcSource,
+  type SourceFreshness,
+  type SourceGuide,
+} from '../rpc/sources-rpc.js';
 import { QueryRpc } from '../rpc/query-rpc.js';
-import { StudioRpc, type StudioType } from '../rpc/studio-rpc.js';
+import {
+  StudioRpc,
+  type StudioType,
+  type ExportResult,
+  type ExportTarget,
+} from '../rpc/studio-rpc.js';
 import { SharingRpc, type ShareStatus } from '../rpc/sharing-rpc.js';
+import { ChatRpc, type ChatTurn } from '../rpc/chat-rpc.js';
 import {
   MindMapRpc,
   LabelsRpc,
@@ -1689,6 +1700,180 @@ User: "Yes" → call remove_notebook`,
           },
         },
         required: ['note_title'],
+      },
+    },
+    {
+      name: 'rename_source',
+      description:
+        'Rename one source inside a notebook. RPC-backed (no browser). ' +
+        'Identify the source by `source_id` (see list_sources) or by `source_name` — ' +
+        'an ambiguous name is refused rather than guessed.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          notebook_url: { type: 'string', description: 'NotebookLM notebook URL.' },
+          notebook_id: {
+            type: 'string',
+            description: 'Notebook UUID (alternative to notebook_url).',
+          },
+          source_id: { type: 'string', description: 'Source UUID.' },
+          source_name: {
+            type: 'string',
+            description: 'Part of the current source title (alternative to source_id).',
+          },
+          title: { type: 'string', description: 'The new title.' },
+        },
+        required: ['title'],
+      },
+    },
+    {
+      name: 'check_source_freshness',
+      description:
+        'Say whether URL / Drive sources have drifted from what they point at. ' +
+        'Name no source to check the whole notebook. RPC-backed (no browser). ' +
+        '`stale: null` means the server did not say — not that the source is current.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          notebook_url: { type: 'string', description: 'NotebookLM notebook URL.' },
+          notebook_id: {
+            type: 'string',
+            description: 'Notebook UUID (alternative to notebook_url).',
+          },
+          source_id: { type: 'string', description: 'Check only this source.' },
+          source_name: {
+            type: 'string',
+            description: 'Part of a source title (alternative to source_id).',
+          },
+        },
+      },
+    },
+    {
+      name: 'get_source_guide',
+      description:
+        'Read NotebookLM’s own summary and key topics for a single source. RPC-backed. ' +
+        'A source NotebookLM has not summarised yet returns an empty summary.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          notebook_url: { type: 'string', description: 'NotebookLM notebook URL.' },
+          notebook_id: {
+            type: 'string',
+            description: 'Notebook UUID (alternative to notebook_url).',
+          },
+          source_id: { type: 'string', description: 'Source UUID.' },
+          source_name: {
+            type: 'string',
+            description: 'Part of the source title (alternative to source_id).',
+          },
+        },
+      },
+    },
+    {
+      name: 'get_notebook_summary',
+      description:
+        'Read a notebook’s own summary of its sources and the questions it suggests asking. ' +
+        'RPC-backed (no browser). Cheaper than asking a question to find out what is in there.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          notebook_url: { type: 'string', description: 'NotebookLM notebook URL.' },
+          notebook_id: {
+            type: 'string',
+            description: 'Notebook UUID (alternative to notebook_url).',
+          },
+        },
+      },
+    },
+    {
+      name: 'get_chat_history',
+      description:
+        'Read back the questions and answers already recorded in a notebook, newest first. ' +
+        'RPC-backed (no browser). NotebookLM exposes only the most recent conversation, ' +
+        'which is what you get unless you pass `conversation_id`.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          notebook_url: { type: 'string', description: 'NotebookLM notebook URL.' },
+          notebook_id: {
+            type: 'string',
+            description: 'Notebook UUID (alternative to notebook_url).',
+          },
+          conversation_id: {
+            type: 'string',
+            description: 'A specific conversation. Defaults to the most recent one.',
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum turns to return, newest first. Default 20.',
+          },
+        },
+      },
+    },
+    {
+      name: 'delete_chat_history',
+      description:
+        'Clear a notebook’s chat history. RPC-backed (no browser). ' +
+        'NotebookLM has no per-turn delete: the whole conversation goes. ' +
+        'The next question then starts a fresh conversation.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          notebook_url: { type: 'string', description: 'NotebookLM notebook URL.' },
+          notebook_id: {
+            type: 'string',
+            description: 'Notebook UUID (alternative to notebook_url).',
+          },
+          conversation_id: {
+            type: 'string',
+            description: 'A specific conversation. Defaults to the most recent one.',
+          },
+        },
+      },
+    },
+    {
+      name: 'export_artifact',
+      description:
+        'Export a finished Studio artifact to Google Docs or Google Sheets. RPC-backed. ' +
+        'Returns the created document link when the server sends one.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          notebook_url: { type: 'string', description: 'NotebookLM notebook URL.' },
+          notebook_id: {
+            type: 'string',
+            description: 'Notebook UUID (alternative to notebook_url).',
+          },
+          artifact_id: { type: 'string', description: 'Artifact id (see list_content).' },
+          target: {
+            type: 'string',
+            enum: ['docs', 'sheets'],
+            description: 'Where to export. Default docs; use sheets for a data table.',
+          },
+          title: { type: 'string', description: 'Title of the created document.' },
+        },
+        required: ['artifact_id'],
+      },
+    },
+    {
+      name: 'revise_slide',
+      description:
+        'Revise one slide of an existing slide deck from a prompt, instead of regenerating ' +
+        'the whole deck. RPC-backed. `slide_index` is zero-based. The call returns as soon as ' +
+        'the revision is accepted; poll list_content for the result.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          notebook_url: { type: 'string', description: 'NotebookLM notebook URL.' },
+          notebook_id: {
+            type: 'string',
+            description: 'Notebook UUID (alternative to notebook_url).',
+          },
+          artifact_id: { type: 'string', description: 'Slide deck artifact id.' },
+          slide_index: { type: 'number', description: 'Zero-based slide number.' },
+          prompt: { type: 'string', description: 'What to change on that slide.' },
+        },
+        required: ['artifact_id', 'slide_index', 'prompt'],
       },
     },
     {
@@ -3451,28 +3636,7 @@ export class ToolHandlers {
       }
 
       const client = await this.getRpcClient();
-      let sourceId = args.source_id;
-      if (!sourceId) {
-        const needle = args.source_name!.toLowerCase();
-        const sources = await new NotebookRpc(client).getSources(notebookId);
-        const matches = sources.filter((s) => s.title.toLowerCase().includes(needle));
-        if (matches.length === 0) {
-          return { success: false, error: `No source matching "${args.source_name}"` };
-        }
-        if (matches.length > 1) {
-          // Name a handful so the caller can refine, but never the whole list:
-          // a 150-source notebook would answer an ambiguous name with an error
-          // bigger than the document it was asked to read.
-          const shown = matches.slice(0, 5).map((m) => m.title);
-          const rest = matches.length - shown.length;
-          const titles = shown.join(', ') + (rest > 0 ? `, and ${rest} more` : '');
-          return {
-            success: false,
-            error: `"${args.source_name}" matches ${matches.length} sources (${titles}) — pass source_id (see list_sources)`,
-          };
-        }
-        sourceId = matches[0].id;
-      }
+      const sourceId = await this.resolveSourceId(client, notebookId, args);
 
       const fulltext = await new SourcesRpc(client).getSourceFulltext(notebookId, sourceId, format);
       if (!fulltext) {
@@ -4326,6 +4490,306 @@ export class ToolHandlers {
     const client = await this.getRpcClient();
     const notebooks = new NotebookRpc(client);
     return { query: new QueryRpc(client, notebooks), notebooks };
+  }
+
+  /**
+   * Resolve a source by id or by name within one notebook.
+   *
+   * Shared by every tool that takes `source_id` / `source_name`. An ambiguous
+   * name throws rather than picking the first match: reading — or renaming —
+   * the wrong source silently is worse than asking again.
+   */
+  private async resolveSourceId(
+    client: BatchExecuteClient,
+    notebookId: string,
+    args: { source_id?: string; source_name?: string }
+  ): Promise<string> {
+    if (args.source_id) return args.source_id;
+    if (!args.source_name) throw new Error('Either source_id or source_name is required');
+
+    const needle = args.source_name.toLowerCase();
+    const sources = await new NotebookRpc(client).getSources(notebookId);
+    const matches = sources.filter((s) => s.title.toLowerCase().includes(needle));
+    if (matches.length === 0) throw new Error(`No source matching "${args.source_name}"`);
+    if (matches.length > 1) {
+      // Name a handful so the caller can refine, but never the whole list:
+      // a 150-source notebook would answer an ambiguous name with an error
+      // bigger than the document it was asked to read.
+      const shown = matches.slice(0, 5).map((m) => m.title);
+      const rest = matches.length - shown.length;
+      const titles = shown.join(', ') + (rest > 0 ? `, and ${rest} more` : '');
+      throw new Error(
+        `"${args.source_name}" matches ${matches.length} sources (${titles}) — pass source_id (see list_sources)`
+      );
+    }
+    return matches[0].id;
+  }
+
+  /** Rename one source in place (RPC-only; the DOM tool never exposed it). */
+  async handleRenameSource(args: {
+    notebook_url?: string;
+    notebook_id?: string;
+    source_id?: string;
+    source_name?: string;
+    title: string;
+  }): Promise<ToolResult<{ notebookId: string; sourceId: string; title: string }>> {
+    log.info(`🔧 [TOOL] rename_source called`);
+    try {
+      if (!args.title?.trim()) return { success: false, error: 'title is required' };
+      const notebookId = this.resolveNotebookId(args.notebook_url, args.notebook_id);
+      if (!notebookId) {
+        return { success: false, error: 'No notebook specified (notebook_url or notebook_id)' };
+      }
+      const client = await this.getRpcClient();
+      const sourceId = await this.resolveSourceId(client, notebookId, args);
+      await new SourcesRpc(client).renameSource(notebookId, sourceId, args.title);
+      log.success(`  ✅ (RPC) renamed ${sourceId} to "${args.title}"`);
+      return { success: true, data: { notebookId, sourceId, title: args.title } };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log.error(`❌ [TOOL] rename_source failed: ${msg}`);
+      return { success: false, error: msg };
+    }
+  }
+
+  /**
+   * Report whether URL / Drive sources have drifted from what they point at.
+   *
+   * With no source named it checks the whole notebook, which is the question
+   * an agent actually has before a long run: is anything I am about to cite
+   * out of date?
+   */
+  async handleSourceFreshness(args: {
+    notebook_url?: string;
+    notebook_id?: string;
+    source_id?: string;
+    source_name?: string;
+  }): Promise<
+    ToolResult<{ notebookId: string; checked: number; stale: number; sources: SourceFreshness[] }>
+  > {
+    log.info(`🔧 [TOOL] check_source_freshness called`);
+    try {
+      const notebookId = this.resolveNotebookId(args.notebook_url, args.notebook_id);
+      if (!notebookId) {
+        return { success: false, error: 'No notebook specified (notebook_url or notebook_id)' };
+      }
+      const client = await this.getRpcClient();
+      const sources = new SourcesRpc(client);
+
+      let ids: string[];
+      if (args.source_id || args.source_name) {
+        ids = [await this.resolveSourceId(client, notebookId, args)];
+      } else {
+        ids = await new NotebookRpc(client).getSourceIds(notebookId);
+      }
+
+      const results: SourceFreshness[] = [];
+      for (const id of ids) results.push(await sources.checkFreshness(notebookId, id));
+      const stale = results.filter((r) => r.stale === true).length;
+      log.success(`  ✅ (RPC) checked ${results.length} source(s), ${stale} stale`);
+      return {
+        success: true,
+        data: { notebookId, checked: results.length, stale, sources: results },
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log.error(`❌ [TOOL] check_source_freshness failed: ${msg}`);
+      return { success: false, error: msg };
+    }
+  }
+
+  /** NotebookLM's own summary and key topics for one source. */
+  async handleSourceGuide(args: {
+    notebook_url?: string;
+    notebook_id?: string;
+    source_id?: string;
+    source_name?: string;
+  }): Promise<ToolResult<SourceGuide & { notebookId: string }>> {
+    log.info(`🔧 [TOOL] get_source_guide called`);
+    try {
+      const notebookId = this.resolveNotebookId(args.notebook_url, args.notebook_id);
+      if (!notebookId) {
+        return { success: false, error: 'No notebook specified (notebook_url or notebook_id)' };
+      }
+      const client = await this.getRpcClient();
+      const sourceId = await this.resolveSourceId(client, notebookId, args);
+      const guide = await new SourcesRpc(client).getSourceGuide(notebookId, sourceId);
+      log.success(`  ✅ (RPC) guide for ${sourceId}: ${guide.keyTopics.length} topic(s)`);
+      return { success: true, data: { ...guide, notebookId } };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log.error(`❌ [TOOL] get_source_guide failed: ${msg}`);
+      return { success: false, error: msg };
+    }
+  }
+
+  /** A notebook's own summary of its sources, plus the questions it suggests. */
+  async handleNotebookSummary(args: {
+    notebook_url?: string;
+    notebook_id?: string;
+  }): Promise<ToolResult<NotebookSummary & { notebookId: string }>> {
+    log.info(`🔧 [TOOL] get_notebook_summary called`);
+    try {
+      const notebookId = this.resolveNotebookId(args.notebook_url, args.notebook_id);
+      if (!notebookId) {
+        return { success: false, error: 'No notebook specified (notebook_url or notebook_id)' };
+      }
+      const summary = await new NotebookRpc(await this.getRpcClient()).getSummary(notebookId);
+      log.success(`  ✅ (RPC) summary + ${summary.suggestedTopics.length} suggested topic(s)`);
+      return { success: true, data: { ...summary, notebookId } };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log.error(`❌ [TOOL] get_notebook_summary failed: ${msg}`);
+      return { success: false, error: msg };
+    }
+  }
+
+  /**
+   * Read back what was already asked in a notebook, newest first.
+   *
+   * Without this an agent resuming work had no way to see its own earlier
+   * answers and paid to ask them again. The server exposes only the most
+   * recent conversation, so that is what this returns unless a caller names
+   * another one.
+   */
+  async handleChatHistory(args: {
+    notebook_url?: string;
+    notebook_id?: string;
+    conversation_id?: string;
+    limit?: number;
+  }): Promise<
+    ToolResult<{
+      notebookId: string;
+      conversationId: string | null;
+      count: number;
+      turns: ChatTurn[];
+    }>
+  > {
+    log.info(`🔧 [TOOL] get_chat_history called`);
+    try {
+      const notebookId = this.resolveNotebookId(args.notebook_url, args.notebook_id);
+      if (!notebookId) {
+        return { success: false, error: 'No notebook specified (notebook_url or notebook_id)' };
+      }
+      if (args.limit !== undefined && (!Number.isFinite(args.limit) || args.limit < 1)) {
+        return { success: false, error: 'limit must be a positive number' };
+      }
+      const chat = new ChatRpc(await this.getRpcClient());
+      const conversationId = args.conversation_id || (await chat.getLastConversationId(notebookId));
+      if (!conversationId) {
+        log.info(`  ℹ️ No conversation yet in ${notebookId}`);
+        return { success: true, data: { notebookId, conversationId: null, count: 0, turns: [] } };
+      }
+      const limit = Math.floor(args.limit ?? 20);
+      const turns = await chat.getTurns(notebookId, conversationId, limit);
+      log.success(`  ✅ (RPC) ${turns.length} turn(s)`);
+      return {
+        success: true,
+        data: { notebookId, conversationId, count: turns.length, turns },
+      };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log.error(`❌ [TOOL] get_chat_history failed: ${msg}`);
+      return { success: false, error: msg };
+    }
+  }
+
+  /**
+   * Clear a notebook's chat history — the whole conversation, since NotebookLM
+   * has no per-turn delete.
+   */
+  async handleDeleteChatHistory(args: {
+    notebook_url?: string;
+    notebook_id?: string;
+    conversation_id?: string;
+  }): Promise<ToolResult<{ notebookId: string; conversationId: string | null; deleted: boolean }>> {
+    log.info(`🔧 [TOOL] delete_chat_history called`);
+    try {
+      const notebookId = this.resolveNotebookId(args.notebook_url, args.notebook_id);
+      if (!notebookId) {
+        return { success: false, error: 'No notebook specified (notebook_url or notebook_id)' };
+      }
+      const chat = new ChatRpc(await this.getRpcClient());
+      const conversationId = args.conversation_id || (await chat.getLastConversationId(notebookId));
+      if (!conversationId) {
+        // Nothing to delete is not a failure, but it is not a deletion either.
+        return { success: true, data: { notebookId, conversationId: null, deleted: false } };
+      }
+      await chat.deleteConversation(notebookId, conversationId);
+      log.success(`  ✅ (RPC) chat history cleared`);
+      return { success: true, data: { notebookId, conversationId, deleted: true } };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log.error(`❌ [TOOL] delete_chat_history failed: ${msg}`);
+      return { success: false, error: msg };
+    }
+  }
+
+  /** Export a finished Studio artifact to Google Docs or Sheets. */
+  async handleExportArtifact(args: {
+    notebook_url?: string;
+    notebook_id?: string;
+    artifact_id: string;
+    target?: ExportTarget;
+    title?: string;
+  }): Promise<ToolResult<ExportResult & { notebookId: string }>> {
+    log.info(`🔧 [TOOL] export_artifact called`);
+    try {
+      if (!args.artifact_id) return { success: false, error: 'artifact_id is required' };
+      const notebookId = this.resolveNotebookId(args.notebook_url, args.notebook_id);
+      if (!notebookId) {
+        return { success: false, error: 'No notebook specified (notebook_url or notebook_id)' };
+      }
+      const target: ExportTarget = args.target === 'sheets' ? 'sheets' : 'docs';
+      const result = await new StudioRpc(await this.getRpcClient()).exportArtifact(
+        notebookId,
+        args.artifact_id,
+        target,
+        args.title?.trim() || 'Export'
+      );
+      log.success(
+        `  ✅ (RPC) exported to ${target}${result.documentUrl ? `: ${result.documentUrl}` : ''}`
+      );
+      return { success: true, data: { ...result, notebookId } };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log.error(`❌ [TOOL] export_artifact failed: ${msg}`);
+      return { success: false, error: msg };
+    }
+  }
+
+  /**
+   * Revise one slide of an existing deck from a prompt, instead of
+   * regenerating the whole presentation.
+   */
+  async handleReviseSlide(args: {
+    notebook_url?: string;
+    notebook_id?: string;
+    artifact_id: string;
+    slide_index: number;
+    prompt: string;
+  }): Promise<ToolResult<{ notebookId: string; artifactId: string; status: string }>> {
+    log.info(`🔧 [TOOL] revise_slide called`);
+    try {
+      if (!args.artifact_id) return { success: false, error: 'artifact_id is required' };
+      if (!args.prompt?.trim()) return { success: false, error: 'prompt is required' };
+      const notebookId = this.resolveNotebookId(args.notebook_url, args.notebook_id);
+      if (!notebookId) {
+        return { success: false, error: 'No notebook specified (notebook_url or notebook_id)' };
+      }
+      const result = await new StudioRpc(await this.getRpcClient()).reviseSlide(
+        notebookId,
+        args.artifact_id,
+        args.slide_index,
+        args.prompt
+      );
+      log.success(`  ✅ (RPC) slide ${args.slide_index} revision ${result.status}`);
+      return { success: true, data: { notebookId, ...result } };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log.error(`❌ [TOOL] revise_slide failed: ${msg}`);
+      return { success: false, error: msg };
+    }
   }
 
   /**

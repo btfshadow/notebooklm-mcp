@@ -1,7 +1,7 @@
-# NotebookLM REST API reference — 45 HTTP endpoints
+# NotebookLM REST API reference — 53 HTTP endpoints
 
-> **Coverage.** All 45 endpoints the server exposes are documented below, and
-> the [OpenAPI 3.1 spec](pathname:///openapi.yaml) carries the same 45 —
+> **Coverage.** All 53 endpoints the server exposes are documented below, and
+> the [OpenAPI 3.1 spec](pathname:///openapi.yaml) carries the same 53 —
 > both checked against the routes declared in the code.
 
 > Complete reference for the NotebookLM HTTP REST API. Citation-backed Q&A,
@@ -27,7 +27,7 @@ Or for network access: `http://<SERVER-IP>:3000`
 
 ---
 
-## Available Endpoints (45 total)
+## Available Endpoints (53 total)
 
 ### Authentication
 
@@ -2602,6 +2602,274 @@ matches more than one source.
 | **Request timeout**       | 120 sec   | ❌ No (hardcoded)          |
 | **Max question size**     | Unlimited | ❌ No                      |
 | **NotebookLM rate limit** | 50/day    | ❌ No (Google limit)       |
+
+### `GET /notebooks/:id/summary`
+
+A notebook's own summary of its sources, plus the questions NotebookLM suggests asking. RPC-backed (no browser) — far cheaper than asking a question to find out what a notebook holds.
+
+**Request:**
+
+```bash
+curl http://localhost:3000/notebooks/74912e55-34a4-4027-bdcc-8e89badd0efd/summary
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notebookId": "74912e55-34a4-4027-bdcc-8e89badd0efd",
+    "summary": "Six papers on retrieval-augmented generation, 2023-2026.",
+    "suggestedTopics": [
+      { "question": "What do they agree on?", "prompt": "Summarise the points of agreement" }
+    ]
+  }
+}
+```
+
+A notebook NotebookLM has not summarised yet returns an empty `summary` and no topics.
+
+---
+
+### `GET /notebooks/:id/freshness`
+
+Report whether URL and Drive sources have drifted from what they point at. Checks the whole notebook unless `source_id` narrows it.
+
+**Query Parameters:**
+
+| Parameter   | Type   | Required | Description                                   |
+| ----------- | ------ | -------- | --------------------------------------------- |
+| `source_id` | string | No       | Check only this source instead of all of them |
+
+**Request:**
+
+```bash
+curl http://localhost:3000/notebooks/74912e55-34a4-4027-bdcc-8e89badd0efd/freshness
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notebookId": "74912e55-34a4-4027-bdcc-8e89badd0efd",
+    "checked": 3,
+    "stale": 1,
+    "sources": [
+      { "id": "4b9e...", "stale": false },
+      { "id": "7c21...", "stale": true },
+      { "id": "9f08...", "stale": null }
+    ]
+  }
+}
+```
+
+⚠️ `stale: null` means the server did not answer for that source — **not** that it is current. Treat it as unknown and check the source yourself before relying on it.
+
+---
+
+### `GET /notebooks/:id/chat`
+
+Read back the questions and answers already recorded in a notebook, newest first. An agent resuming work can see what it already asked instead of paying to ask again.
+
+**Query Parameters:**
+
+| Parameter         | Type   | Required | Description                                          |
+| ----------------- | ------ | -------- | ---------------------------------------------------- |
+| `conversation_id` | string | No       | A specific conversation; defaults to the most recent |
+| `limit`           | number | No       | Maximum turns, newest first (default 20)             |
+
+**Request:**
+
+```bash
+curl "http://localhost:3000/notebooks/74912e55-34a4-4027-bdcc-8e89badd0efd/chat?limit=4"
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notebookId": "74912e55-34a4-4027-bdcc-8e89badd0efd",
+    "conversationId": "a1b2c3d4-...",
+    "count": 2,
+    "turns": [
+      { "role": "question", "text": "What do these papers agree on?" },
+      { "role": "answer", "text": "All six treat retrieval as..." }
+    ]
+  }
+}
+```
+
+NotebookLM exposes only the most recent conversation per notebook; older ones cannot be listed. A notebook with no history answers `conversationId: null` and no turns.
+
+---
+
+### `DELETE /notebooks/:id/chat`
+
+Clear a notebook's chat history — the web UI's "Delete history". NotebookLM has no per-turn delete, so the whole conversation goes. Afterwards the next question starts a fresh conversation.
+
+**Query Parameters:**
+
+| Parameter         | Type   | Required | Description                                          |
+| ----------------- | ------ | -------- | ---------------------------------------------------- |
+| `conversation_id` | string | No       | A specific conversation; defaults to the most recent |
+
+**Request:**
+
+```bash
+curl -X DELETE http://localhost:3000/notebooks/74912e55-34a4-4027-bdcc-8e89badd0efd/chat
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": { "notebookId": "74912e55-...", "conversationId": "a1b2c3d4-...", "deleted": true }
+}
+```
+
+Nothing to delete is reported as `deleted: false`, not as a failure.
+
+---
+
+### `PATCH /notebooks/:id/sources/:sourceId`
+
+Rename one source in place.
+
+**Request Body:**
+
+| Field   | Type   | Required | Description   |
+| ------- | ------ | -------- | ------------- |
+| `title` | string | ✅ Yes   | The new title |
+
+**Request:**
+
+```bash
+curl -X PATCH http://localhost:3000/notebooks/74912e55-.../sources/4b9e1f22-... \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Chapter 4 — Retrieval"}'
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notebookId": "74912e55-...",
+    "sourceId": "4b9e1f22-...",
+    "title": "Chapter 4 — Retrieval"
+  }
+}
+```
+
+A missing or empty `title` is a 400.
+
+---
+
+### `GET /notebooks/:id/sources/:sourceId/guide`
+
+NotebookLM's own summary and key topics for a single source — what the source panel shows.
+
+**Request:**
+
+```bash
+curl http://localhost:3000/notebooks/74912e55-.../sources/4b9e1f22-.../guide
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notebookId": "74912e55-...",
+    "id": "4b9e1f22-...",
+    "summary": "A 2024 survey of retrieval-augmented generation.",
+    "keyTopics": ["retrieval", "citations", "evaluation"]
+  }
+}
+```
+
+A source NotebookLM has not summarised yet returns an empty `summary` and no topics.
+
+---
+
+### `POST /content/:artifactId/export`
+
+Export a finished Studio artifact to Google Docs or Google Sheets.
+
+**Request Body:**
+
+| Field         | Type   | Required | Description                                                |
+| ------------- | ------ | -------- | ---------------------------------------------------------- |
+| `notebook_id` | string | ✅ Yes\* | Notebook UUID (`notebook_url` works instead)               |
+| `target`      | string | No       | `docs` (default) or `sheets` — use sheets for a data table |
+| `title`       | string | No       | Title of the created document (default `Export`)           |
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/content/artifact-1/export \
+  -H "Content-Type: application/json" \
+  -d '{"notebook_id":"74912e55-...","target":"docs","title":"Literature review"}'
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notebookId": "74912e55-...",
+    "artifactId": "artifact-1",
+    "target": "docs",
+    "documentUrl": "https://docs.google.com/document/d/abc123/edit"
+  }
+}
+```
+
+`documentUrl` is `null` when the reply carried no Drive link — the export may still have succeeded; check Drive.
+
+---
+
+### `POST /content/:artifactId/revise-slide`
+
+Revise one slide of an existing deck from a prompt, instead of regenerating the whole presentation.
+
+**Request Body:**
+
+| Field         | Type   | Required | Description                                  |
+| ------------- | ------ | -------- | -------------------------------------------- |
+| `notebook_id` | string | ✅ Yes\* | Notebook UUID (`notebook_url` works instead) |
+| `slide_index` | number | ✅ Yes   | Zero-based slide number                      |
+| `prompt`      | string | ✅ Yes   | What to change on that slide                 |
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:3000/content/artifact-1/revise-slide \
+  -H "Content-Type: application/json" \
+  -d '{"notebook_id":"74912e55-...","slide_index":2,"prompt":"Cut the third bullet"}'
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "data": { "notebookId": "74912e55-...", "artifactId": "artifact-1", "status": "in_progress" }
+}
+```
+
+The call returns as soon as the revision is accepted; poll `GET /content` for the finished deck.
+
+---
 
 ---
 

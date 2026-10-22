@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: NotebookLM REST API
-  version: 4.2.0
+  version: 4.3.0
   description: |
     Local HTTP REST API for Google NotebookLM. Citation-backed Q&A, Studio
     content generation (audio, video, infographic, report, presentation,
@@ -416,6 +416,127 @@ paths:
         '200':
           description: One page of the source's content, plus how to fetch the rest
 
+    patch:
+      tags: [Sources]
+      summary: Rename one source in place
+      description: RPC-backed (no browser). An empty `title` is a 400.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: sourceId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+              required: [title]
+      responses:
+        '200': { description: The source's new title }
+        '400': { description: Missing or empty title }
+
+  /notebooks/{id}/sources/{sourceId}/guide:
+    get:
+      tags: [Sources]
+      summary: NotebookLM's own summary and key topics for one source
+      description: |
+        RPC-backed (no browser). A source NotebookLM has not summarised yet
+        returns an empty `summary` and no topics.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: sourceId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Summary and key topics }
+
+  /notebooks/{id}/summary:
+    get:
+      tags: [Notebooks]
+      summary: A notebook's own summary of its sources, and the questions it suggests
+      description: |
+        RPC-backed (no browser). Cheaper than asking a question to find out
+        what a notebook holds.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Summary and suggested topics }
+
+  /notebooks/{id}/freshness:
+    get:
+      tags: [Sources]
+      summary: Have the notebook's URL / Drive sources drifted?
+      description: |
+        RPC-backed (no browser). Checks every source unless `source_id`
+        narrows it. `stale: null` means the server did not answer for that
+        source — not that it is current.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: source_id
+          required: false
+          schema: { type: string }
+      responses:
+        '200': { description: Per-source freshness }
+
+  /notebooks/{id}/chat:
+    get:
+      tags: [Notebooks]
+      summary: Read back the recorded questions and answers, newest first
+      description: |
+        RPC-backed (no browser). NotebookLM exposes only the most recent
+        conversation per notebook; older ones cannot be listed.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: conversation_id
+          required: false
+          schema: { type: string }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, default: 20, minimum: 1 }
+      responses:
+        '200': { description: Conversation turns }
+    delete:
+      tags: [Notebooks]
+      summary: Clear the chat history
+      description: |
+        The web UI's "Delete history". NotebookLM has no per-turn delete, so
+        the whole conversation goes. Nothing to delete is reported as
+        `deleted: false`, not as a failure.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: conversation_id
+          required: false
+          schema: { type: string }
+      responses:
+        '200': { description: What was deleted }
+
   /notebooks/{id}/share:
     get:
       tags: [Notebooks]
@@ -446,6 +567,60 @@ paths:
               required: [public]
       responses:
         '200': { description: Sharing status after the change }
+
+  /content/{artifactId}/export:
+    post:
+      tags: [Content]
+      summary: Export a finished artifact to Google Docs or Sheets
+      description: |
+        RPC-backed. `documentUrl` is `null` when the reply carried no Drive
+        link — the export may still have succeeded; check Drive.
+      parameters:
+        - in: path
+          name: artifactId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notebook_id: { type: string }
+                notebook_url: { type: string }
+                target: { type: string, enum: [docs, sheets], default: docs }
+                title: { type: string, default: Export }
+      responses:
+        '200': { description: The export, with the document link when sent }
+
+  /content/{artifactId}/revise-slide:
+    post:
+      tags: [Content]
+      summary: Revise one slide of an existing deck from a prompt
+      description: |
+        RPC-backed. `slide_index` is zero-based. Returns as soon as the
+        revision is accepted; poll `GET /content` for the finished deck.
+      parameters:
+        - in: path
+          name: artifactId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notebook_id: { type: string }
+                notebook_url: { type: string }
+                slide_index: { type: integer, minimum: 0 }
+                prompt: { type: string }
+              required: [slide_index, prompt]
+      responses:
+        '200': { description: The deck's status after the revision }
+        '400': { description: Missing slide_index or prompt }
 
   /notebooks/{id}/labels:
     get:
