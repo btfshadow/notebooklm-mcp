@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.roomi-fields/notebooklm-mcp",
   "title": "NotebookLM MCP",
-  "description": "Automate Google NotebookLM — Q&A with citations, audio, video, content generation",
+  "description": "Google Gemini Notebook (ex NotebookLM) over MCP + a local REST API \u2014 cited answers, Studio, history",
   "repository": {
     "url": "https://github.com/roomi-fields/notebooklm-mcp",
     "source": "github"

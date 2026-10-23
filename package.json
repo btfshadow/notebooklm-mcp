@@ -2,7 +2,7 @@
   "name": "@roomi-fields/notebooklm-mcp",
   "version": "4.3.0",
   "mcpName": "io.github.roomi-fields/notebooklm-mcp",
-  "description": "MCP server for NotebookLM API with HTTP REST API - Zero hallucinations from your notebooks",
+  "description": "Google Gemini Notebook (formerly NotebookLM) over MCP + a local HTTP REST API. Citation-backed Q&A, full Studio generation, chat history, multi-account rotation. For Claude Code, Codex, Cursor, n8n, Zapier, Make.",
   "type": "module",
   "bin": {
     "notebooklm-mcp": "dist/index.js",
