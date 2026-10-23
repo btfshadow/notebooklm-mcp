@@ -92,3 +92,4 @@ actually ask, states its limits, and names alternatives fairly.
 - [GitHub repository](https://github.com/roomi-fields/notebooklm-mcp): source code, issues, releases.
 - [npm package](https://www.npmjs.com/package/@roomi-fields/notebooklm-mcp): install via `npm install @roomi-fields/notebooklm-mcp` or `npx`.
 - [OpenAPI 3.1 spec](https://notebooklm.roomi-fields.com/openapi.yaml): importable in Postman / Insomnia / Bruno / Swagger UI.
+- [AI catalog](https://notebooklm.roomi-fields.com/.well-known/ai-catalog.json): the machine-readable index of what this domain publishes — the MCP server's registry manifest and the Claude Code skill — in the AI Catalog format that SEP-2127 points domain-level discovery at.

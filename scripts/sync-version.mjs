@@ -85,6 +85,15 @@ const targets = [
     transform: (s) => s.replace(/(current version )\d+\.\d+\.\d+/, `$1${VERSION}`),
   },
   {
+    path: 'website/static/.well-known/ai-catalog.json',
+    label: 'AI catalog entry version',
+    // The catalog states the server's version itself, and the AI Catalog spec
+    // makes a present entry version authoritative for latest-selection — a
+    // stale one there is a publishing error that breaks exactly the discovery
+    // the file exists for.
+    transform: (s) => s.replace(/("version":\s*)"\d+\.\d+\.\d+"/g, `$1"${VERSION}"`),
+  },
+  {
     path: 'deployment/docs/openapi.yaml',
     label: 'OpenAPI info.version',
     // The published REST spec carries its own version and had drifted to
