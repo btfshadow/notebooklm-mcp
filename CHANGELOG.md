@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [4.4.0] - 2026-10-24
+
+### Two security fixes, both reported by Umar Ahmed (ghostnshells)
+
+**The server now checks which host a request claims to be addressing**
+(GHSA-2fgr-6pf3-3hcx). The origin guard shipped in 4.0.0 let a request with no
+`Origin` header through, on the stated assumption that only a direct client
+omits that header. A browser omits it too, on any request it believes is
+same-origin — which is what a re-pointed hostname produces. A page the user
+merely visited could therefore read the library, sessions and the full health
+report, unauthenticated. The new host guard runs before every other control
+and refuses any name the server does not serve; loopback names and the bound
+address are always accepted, so no local client is affected.
+`NOTEBOOKLM_ALLOWED_HOSTS` names any further host, such as one behind a
+reverse proxy.
+
+**A caller can no longer steer the browser anywhere but the notebook app**
+(GHSA-q565-44p7-45pv). Twelve routes and one tool accepted a notebook URL and
+handed it to a browser that holds the user's Google session, with no check
+beyond the scheme; exactly one route validated the host. The check now lives
+at the chokepoint they all share, so routes written later inherit it.
+
+Also: `/health` documented a behaviour it did not have. With no token
+configured it returns the full report, and the comment now says so and says
+why that posture is safe.
+
+---
+
 ## [4.3.0] - 2026-10-22
 
 ### Eight tools for calls the server already knew how to make

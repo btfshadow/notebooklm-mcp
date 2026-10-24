@@ -27,6 +27,9 @@
 /** Hosts that identify the notebook web app (both are valid). */
 const NOTEBOOK_HOSTS: readonly string[] = ['notebooklm.google.com', 'notebook.google.com'];
 
+/** The accepted hosts, for an error message that tells the caller what to use. */
+export const NOTEBOOK_HOST_LIST = NOTEBOOK_HOSTS.join(' or ');
+
 /** Google's documented canonical host — used only for host-less entry navigation. */
 export const NOTEBOOK_PRIMARY_HOST = 'notebooklm.google.com';
 

@@ -16,6 +16,7 @@ import { AuthManager } from '../auth/auth-manager.js';
 import { BrowserSession } from './browser-session.js';
 import { SharedContextManager } from './shared-context-manager.js';
 import { CONFIG } from '../config.js';
+import { isNotebookHost, NOTEBOOK_HOST_LIST } from '../utils/notebook-domain.js';
 import { log } from '../utils/logger.js';
 import type { SessionInfo } from '../types.js';
 import { randomBytes } from 'crypto';
@@ -76,6 +77,25 @@ export class SessionManager {
     }
     if (!targetUrl.startsWith('http')) {
       throw new Error('Notebook URL must be an absolute URL');
+    }
+    // The host check belongs HERE and not on the routes. Reported through our
+    // private disclosure channel on 2026-10-24 (GHSA-q565-44p7-45pv) by Umar
+    // Ahmed (ghostnshells): one route validated the host and eleven others
+    // plus an MCP tool did not, so a caller-chosen URL reached `page.goto` on
+    // the browser that holds the user's Google session — cloud metadata,
+    // intranet pages, other loopback ports. Every one of those routes funnels
+    // through this method, so validating at the chokepoint covers the callers
+    // that exist today and the ones nobody has written yet.
+    let targetHost: string;
+    try {
+      targetHost = new URL(targetUrl).hostname;
+    } catch {
+      throw new Error('Notebook URL must be an absolute URL');
+    }
+    if (!isNotebookHost(targetHost)) {
+      throw new Error(
+        `Notebook URL must be a notebook address (${NOTEBOOK_HOST_LIST}), not ${targetHost}`
+      );
     }
 
     // Generate ID if not provided

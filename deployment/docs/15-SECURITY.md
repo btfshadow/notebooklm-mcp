@@ -55,6 +55,25 @@ NOTEBOOKLM_ALLOWED_ORIGINS=https://app.example,https://staging.example npm run s
 There is no wildcard. A page served from an origin you did not list gets `403`,
 whether it is reading or writing.
 
+## The host names the server answers to
+
+A browser omits the `Origin` header on a request it believes is same-origin, so
+origin checking alone cannot tell a local client apart from a page whose
+hostname has been re-pointed at your loopback address. The server therefore
+also checks which name a request claims to be addressing, and refuses anything
+it does not serve:
+
+```bash
+NOTEBOOKLM_ALLOWED_HOSTS=notebooks.internal.example npm run start:http
+```
+
+Loopback names and the address the server is bound to are always accepted, so
+the default posture needs no configuration and `curl`, n8n and the stdio proxy
+are unaffected. Name a host here when you reach the server under some other
+name — through a reverse proxy, for instance. A bind to every interface names
+no host to pin, so the check stands down there unless you list one; that bind
+already refuses to start without a token.
+
 ## Files the caller can name
 
 Three parameters take a filesystem path: `file_path` on `add_source`,

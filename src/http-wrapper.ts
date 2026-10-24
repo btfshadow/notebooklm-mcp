@@ -30,9 +30,11 @@ const SERVER_VERSION = (
 // Extend Express Request to include requestId
 import {
   assertSafeBind,
+  createHostGuard,
   createOriginGuard,
   createTokenGuard,
   isLoopbackHost,
+  resolveAllowedHosts,
   resolveAllowedOrigins,
   resolveApiToken,
   resolveHttpHost,
@@ -61,10 +63,15 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Network exposure controls — see src/http-security.ts (GHSA-p69m-c5rf-g2c3).
-// A browser page gets through only if its origin was allow-listed, and every
+// Network exposure controls — see src/http-security.ts (GHSA-p69m-c5rf-g2c3,
+// GHSA-2fgr-6pf3-3hcx). The host guard runs FIRST: it is the one control that
+// does not depend on a header the caller can simply omit, so a rebound
+// hostname is refused before anything else looks at the request. Then a
+// browser page gets through only if its origin was allow-listed, and every
 // route but /health needs the token once NOTEBOOKLM_API_KEY is set.
 const API_TOKEN = resolveApiToken();
+const HOST = resolveHttpHost();
+app.use(createHostGuard(HOST, resolveAllowedHosts()));
 app.use(createOriginGuard(resolveAllowedOrigins()));
 app.use(createTokenGuard(API_TOKEN));
 
@@ -100,8 +107,11 @@ app.get('/', (_req: Request, res: Response) => {
 // Health check
 app.get('/health', async (_req: Request, res: Response) => {
   try {
-    // Open to monitors and container health checks, so an unauthenticated
-    // caller gets liveness only: the full report names the active notebook.
+    // Open to monitors and container health checks. Once a token is set, a
+    // caller without it gets liveness only, because the full report names the
+    // active notebook. With no token configured there is no caller to tell
+    // apart, so the full report is returned — that posture is loopback-only
+    // and host-guarded, which is what keeps a web page out of it.
     if (API_TOKEN && !_req.authenticatedCaller) {
       return res.json({ status: 'ok', version: SERVER_VERSION });
     }
@@ -1482,7 +1492,6 @@ app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
 
 // Start server with startup sequence
 const PORT = Number(process.env.HTTP_PORT) || 3000;
-const HOST = resolveHttpHost();
 const VERSION = (
   JSON.parse(
     readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf-8')

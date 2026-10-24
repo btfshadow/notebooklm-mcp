@@ -7,9 +7,12 @@ import type { Request, Response, NextFunction } from 'express';
 import {
   DEFAULT_HTTP_HOST,
   assertSafeBind,
+  createHostGuard,
   createOriginGuard,
   createTokenGuard,
+  hostNameOf,
   isLoopbackHost,
+  resolveAllowedHosts,
   resolveAllowedOrigins,
   resolveApiToken,
   resolveHttpHost,
@@ -176,5 +179,78 @@ describe('token guard', () => {
   it('compares tokens of differing length without throwing', () => {
     expect(tokensMatch(token, 'short')).toBe(false);
     expect(tokensMatch(token, token)).toBe(true);
+  });
+});
+
+/**
+ * Host guard — GHSA-2fgr-6pf3-3hcx, reported by Umar Ahmed (ghostnshells).
+ *
+ * The shape that mattered in the report is a request with NO `Origin` and an
+ * attacker-chosen `Host`: the origin guard waves it through, and before this
+ * guard existed so did everything else. These lock the three cases the fix
+ * has to separate — the rebound request, the legitimate local client that
+ * also sends no `Origin`, and the deliberate non-loopback bind.
+ */
+describe('host guard', () => {
+  const run = (guard: ReturnType<typeof createHostGuard>, host?: string) => {
+    const req = mockReq({ headers: host === undefined ? {} : { host } });
+    const res = mockRes();
+    const next = jest.fn();
+    guard(req, res, next as unknown as NextFunction);
+    return { res, next };
+  };
+
+  it('refuses a rebound hostname even though it carries no Origin', () => {
+    const { res, next } = run(createHostGuard('127.0.0.1'), 'attacker.test:3999');
+    expect(res.statusCode).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('still serves the local clients that legitimately send no Origin', () => {
+    for (const host of ['127.0.0.1:3000', 'localhost:3000', '[::1]:3000', 'LOCALHOST:3000']) {
+      const { res, next } = run(createHostGuard('127.0.0.1'), host);
+      expect([host, res.statusCode]).toEqual([host, 0]);
+      expect(next).toHaveBeenCalled();
+    }
+  });
+
+  it('refuses a request that sends no Host at all', () => {
+    // HTTP/1.1 requires one; something that omits it is not a client we serve.
+    const { res, next } = run(createHostGuard('127.0.0.1'));
+    expect(res.statusCode).toBe(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('serves the address an operator deliberately bound to', () => {
+    const { next } = run(createHostGuard('10.0.0.5'), '10.0.0.5:3000');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('serves a name the operator listed, and nothing else', () => {
+    const guard = createHostGuard('0.0.0.0', ['notebooks.example.com']);
+    expect(run(guard, 'notebooks.example.com').next).toHaveBeenCalled();
+    expect(run(guard, 'attacker.test').res.statusCode).toBe(403);
+  });
+
+  it('stands down on a wildcard bind with no list, where no host can be pinned', () => {
+    // That posture already refuses to start without a token (assertSafeBind),
+    // and the token is what stops the rebound read there.
+    const { next } = run(createHostGuard('0.0.0.0'), 'anything.test');
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('reads the host name out of the header the same way a browser writes it', () => {
+    expect(hostNameOf('127.0.0.1:3000')).toBe('127.0.0.1');
+    expect(hostNameOf('[::1]:3000')).toBe('::1');
+    expect(hostNameOf('Example.COM')).toBe('example.com');
+    expect(hostNameOf(undefined)).toBe('');
+  });
+
+  it('collects allowed host names from the environment', () => {
+    expect(resolveAllowedHosts({ NOTEBOOKLM_ALLOWED_HOSTS: ' a.test , b.test ,, ' })).toEqual([
+      'a.test',
+      'b.test',
+    ]);
+    expect(resolveAllowedHosts({})).toEqual([]);
   });
 });

@@ -126,6 +126,41 @@ describe('SessionManager', () => {
         'must be an absolute URL'
       );
     });
+
+    /**
+     * GHSA-q565-44p7-45pv, reported by Umar Ahmed (ghostnshells): a
+     * caller-chosen URL reached the browser that holds the user's Google
+     * session, because only one of the twelve routes that accept one checked
+     * the host. The check now lives here, at the chokepoint they all share,
+     * so a route added tomorrow inherits it without anyone remembering to.
+     */
+    it('refuses to navigate anywhere that is not the notebook app', async () => {
+      const manager = new SessionManager(mockAuthManager);
+
+      for (const url of [
+        'http://127.0.0.1:4777/pwned',
+        'http://169.254.169.254/latest/meta-data/',
+        'http://intranet.corp/',
+        'https://notebooklm.google.com.attacker.test/notebook/x',
+        'https://attacker.test/?u=https://notebooklm.google.com/',
+      ]) {
+        await expect(manager.getOrCreateSession('test-session', url)).rejects.toThrow(
+          'must be a notebook address'
+        );
+      }
+    });
+
+    it('still accepts both hosts the notebook app actually answers on', async () => {
+      const manager = new SessionManager(mockAuthManager);
+
+      // Rejected later for lack of a browser, never for the host — the point
+      // is that a guard which blocks the real hosts is worse than no guard.
+      for (const host of ['notebooklm.google.com', 'notebook.google.com']) {
+        await expect(
+          manager.getOrCreateSession('test-session', `https://${host}/notebook/abc`)
+        ).rejects.not.toThrow('must be a notebook address');
+      }
+    });
   });
 
   describe('Close Operations', () => {
