@@ -31,7 +31,13 @@ if (!VERSION) {
   process.exit(2);
 }
 
-/** @type {Array<{path: string, label: string, transform: (s: string) => string}>} */
+/**
+ * Each transform takes the version to write, so the driver can run it twice:
+ * once for real, once with a sentinel. A rule that changes nothing either way
+ * matched nothing at all, which is a broken rule rather than a file in step.
+ *
+ * @type {Array<{path: string, label: string, transform: (s: string, v: string) => string}>}
+ */
 const targets = [
   {
     path: '.claude-plugin/plugin.json',
@@ -48,23 +54,23 @@ const targets = [
     //      published releases until the cache is manually purged. By pinning
     //      to the same version /plugin update just installed, we force npx
     //      to fetch (or use the matching cache) for that exact version.
-    transform: (s) =>
+    transform: (s, v) =>
       s
-        .replace(/^(\s*"version":\s*)"\d+\.\d+\.\d+"/m, `$1"${VERSION}"`)
+        .replace(/^(\s*"version":\s*)"\d+\.\d+\.\d+"/m, `$1"${v}"`)
         .replace(
           /"@roomi-fields\/notebooklm-mcp(?:@\d+\.\d+\.\d+)?"/,
-          `"@roomi-fields/notebooklm-mcp@${VERSION}"`
+          `"@roomi-fields/notebooklm-mcp@${v}"`
         ),
   },
   {
     path: 'website/docusaurus.config.ts',
     label: 'docusaurus softwareVersion',
-    transform: (s) => s.replace(/softwareVersion:\s*'[^']+'/, `softwareVersion: '${VERSION}'`),
+    transform: (s, v) => s.replace(/softwareVersion:\s*'[^']+'/, `softwareVersion: '${v}'`),
   },
   {
     path: 'README.md',
     label: 'README hero version',
-    transform: (s) => s.replace(/(>\s*v)\d+\.\d+\.\d+(\s+—)/, `$1${VERSION}$2`),
+    transform: (s, v) => s.replace(/(>\s*v)\d+\.\d+\.\d+(\s+—)/, `$1${v}$2`),
   },
   {
     path: 'server.json',
@@ -73,7 +79,7 @@ const targets = [
     // package.json, or the published registry entry drifts (it sat at 1.5.9
     // while the package shipped 3.0.0). Global replace hits both; the "$schema"
     // URL has no "version" key so it is untouched.
-    transform: (s) => s.replace(/("version":\s*)"\d+\.\d+\.\d+"/g, `$1"${VERSION}"`),
+    transform: (s, v) => s.replace(/("version":\s*)"\d+\.\d+\.\d+"/g, `$1"${v}"`),
   },
   {
     path: 'website/static/llms.txt',
@@ -82,7 +88,7 @@ const targets = [
     // drifted furthest: it still announced 1.5.9 and "33 endpoints" while
     // the package shipped 4.1.0 with 45 — so engines quoting us repeated a
     // version six releases old. Nothing else was syncing it.
-    transform: (s) => s.replace(/(current version )\d+\.\d+\.\d+/, `$1${VERSION}`),
+    transform: (s, v) => s.replace(/(current version )\d+\.\d+\.\d+/, `$1${v}`),
   },
   {
     path: 'website/static/.well-known/ai-catalog.json',
@@ -91,7 +97,7 @@ const targets = [
     // makes a present entry version authoritative for latest-selection — a
     // stale one there is a publishing error that breaks exactly the discovery
     // the file exists for.
-    transform: (s) => s.replace(/("version":\s*)"\d+\.\d+\.\d+"/g, `$1"${VERSION}"`),
+    transform: (s, v) => s.replace(/("version":\s*)"\d+\.\d+\.\d+"/g, `$1"${v}"`),
   },
   {
     path: 'deployment/docs/openapi.yaml',
@@ -99,22 +105,49 @@ const targets = [
     // The published REST spec carries its own version and had drifted to
     // 1.5.9 while the package shipped 3.0.x — consumers generating a client
     // from it were told they were on a two-major-versions-old API.
-    transform: (s) => s.replace(/(^info:\n(?:.*\n)*?  version:\s*)\d+\.\d+\.\d+/m, `$1${VERSION}`),
+    transform: (s, v) => s.replace(/(^info:\n(?:.*\n)*?  version:\s*)\d+\.\d+\.\d+/m, `$1${v}`),
   },
   {
     path: 'ROADMAP.md',
     label: 'ROADMAP current version',
     // The "## Current Version" header drifted to 1.5.4 while the package shipped
     // 3.0.x. Kept in lockstep here (and enforced by version:check in CI).
-    transform: (s) => s.replace(/(## Current Version:\s*v)\d+\.\d+\.\d+/, `$1${VERSION}`),
+    transform: (s, v) => s.replace(/(## Current Version:\s*v)\d+\.\d+\.\d+/, `$1${v}`),
   },
 ];
 
+/**
+ * A version this file could never legitimately hold, used to ask a rule "would
+ * you change anything at all?" without caring what it would change it to.
+ */
+const SENTINEL = '0.0.0';
+
 let drifted = 0;
+let broken = 0;
 for (const target of targets) {
   const fullPath = join(ROOT, target.path);
-  const original = readFileSync(fullPath, 'utf-8');
-  const updated = target.transform(original);
+  const raw = readFileSync(fullPath, 'utf-8');
+  // Match against LF text and restore the file's own endings on write. A CRLF
+  // working copy silently defeated the `^info:\n` anchor in the OpenAPI rule,
+  // which then changed nothing and was reported as "already current" — a green
+  // tick for a rule that had stopped running. CI, on an LF checkout, caught the
+  // drift the local run had just blessed.
+  const crlf = raw.includes('\r\n');
+  const original = crlf ? raw.replace(/\r\n/g, '\n') : raw;
+  const updated = target.transform(original, VERSION);
+
+  // Distinguish "already correct" from "matched nothing": a rule that is also
+  // inert against a version the file cannot be holding is a rule that no
+  // longer finds its target — reindented, renamed, or anchored on the wrong
+  // line ending. Reporting that as in step is how a stale version ships.
+  if (target.transform(original, SENTINEL) === original) {
+    broken++;
+    console.error(
+      `✗ ${target.path} (${target.label}): the rule matched nothing — ` +
+        `the file moved out from under it, or its anchor is wrong`
+    );
+    continue;
+  }
 
   if (original === updated) {
     console.log(`✓ ${target.path} already at ${VERSION} (${target.label})`);
@@ -125,9 +158,14 @@ for (const target of targets) {
   if (checkOnly) {
     console.error(`✗ DRIFT in ${target.path} (${target.label})`);
   } else {
-    writeFileSync(fullPath, updated, 'utf-8');
+    writeFileSync(fullPath, crlf ? updated.replace(/\n/g, '\r\n') : updated, 'utf-8');
     console.log(`→ ${target.path} synced to ${VERSION} (${target.label})`);
   }
+}
+
+if (broken > 0) {
+  console.error(`\n${broken} rule(s) in this script no longer match their file. Fix the rule.`);
+  process.exit(1);
 }
 
 if (checkOnly && drifted > 0) {
