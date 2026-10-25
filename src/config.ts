@@ -277,7 +277,18 @@ function parseContentLanguage(value: string | undefined, defaultValue: string): 
 function applyEnvOverrides(config: Config): Config {
   // Support custom DATA_DIR for multiple instances
   // IMPORTANT: trim() to remove trailing spaces from Windows env vars
-  const customDataDir = process.env.DATA_DIR?.trim();
+  const envDataDir =
+    process.env.DATA_DIR?.trim() ||
+    process.env.NOTEBOOKLM_DATA_DIR?.trim() ||
+    process.env.NOTEBOOKLM_DATA_PATH?.trim();
+  const autoDataDir =
+    !envDataDir &&
+    process.platform === 'linux' &&
+    fs.existsSync('/data') &&
+    fs.statSync('/data').isDirectory()
+      ? '/data'
+      : undefined;
+  const customDataDir = envDataDir || autoDataDir;
   const dataDir = customDataDir || config.dataDir;
 
   return {
