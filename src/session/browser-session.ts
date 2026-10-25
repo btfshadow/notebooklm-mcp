@@ -853,13 +853,40 @@ export class BrowserSession {
       return;
     }
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        await this.page.keyboard.press('Escape');
-        await randomDelay(200, 350);
-      } catch {
-        break;
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await randomDelay(150, 250);
       }
+
+      // Aggressively remove Angular Material overlays that block clicks
+
+      await this.page
+        .evaluate(() => {
+          const doc: any = (globalThis as any).document;
+          if (!doc) return;
+          const selectors = [
+            '.cdk-overlay-backdrop',
+            '.cdk-overlay-container',
+            '.cdk-global-overlay-wrapper',
+            '.mat-mdc-dialog-container',
+            '.mat-dialog-container',
+          ];
+          for (const sel of selectors) {
+            doc.querySelectorAll(sel).forEach((el: any) => {
+              try {
+                el.remove();
+              } catch {
+                /* ignore */
+              }
+            });
+          }
+        })
+        .catch(() => {});
+
+      await randomDelay(250, 400);
+    } catch {
+      /* ignore */
     }
   }
 

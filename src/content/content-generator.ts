@@ -716,17 +716,48 @@ export class ContentGenerator {
 
     // Dismiss any overlays
     try {
-      await this.page.keyboard.press('Escape').catch(() => {});
-      await randomDelay(200, 300);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await this.page.evaluate(() => {
-        const doc: any = (globalThis as any).document;
-        if (!doc) return;
-        doc.querySelectorAll('.cdk-overlay-backdrop').forEach((b: any) => b.click?.());
-        doc.querySelectorAll('button[aria-label="Close"], button[aria-label="Fechar"], button[aria-label="Cerrar"]').forEach((b: any) => b.click?.());
-      }).catch(() => {});
-      await randomDelay(200, 300);
-    } catch {}
+      for (let i = 0; i < 3; i++) {
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await randomDelay(150, 250);
+      }
+
+      await this.page
+        .evaluate(() => {
+          const doc: any = (globalThis as any).document;
+          if (!doc) return;
+          const sels = [
+            '.cdk-overlay-backdrop',
+            '.cdk-overlay-container',
+            '.cdk-global-overlay-wrapper',
+            '.mat-mdc-dialog-container',
+            '.mat-dialog-container',
+          ];
+          for (const sel of sels) {
+            doc.querySelectorAll(sel).forEach((el: any) => {
+              try {
+                el.remove();
+              } catch {
+                /* ignore */
+              }
+            });
+          }
+          doc
+            .querySelectorAll(
+              'button[aria-label="Close"], button[aria-label="Fechar"], button[aria-label="Cerrar"], button[aria-label="Got it"], button[aria-label="Entendi"], button[aria-label="Dismiss"], button[aria-label="OK"]'
+            )
+            .forEach((b: any) => {
+              try {
+                b.click();
+              } catch {
+                /* ignore */
+              }
+            });
+        })
+        .catch(() => {});
+      await randomDelay(300, 400);
+    } catch {
+      /* ignore */
+    }
 
     // Find the chat input (same approach as BrowserSession.findChatInput)
     const chatInputSelectors = [
@@ -765,18 +796,43 @@ export class ContentGenerator {
     const inputEl = await this.page.$(inputSelector);
     if (inputEl) {
       try {
-        await this.page.keyboard.press('Escape').catch(() => {});
-        await randomDelay(200, 300);
-        // Try to remove any overlay
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await this.page.evaluate(() => {
-          const doc: any = (globalThis as any).document;
-          if (!doc) return;
-          const overlays = doc.querySelectorAll('.cdk-overlay-backdrop, .cdk-overlay-container .mat-mdc-dialog-container, .mat-dialog-container');
-          overlays.forEach((o: any) => o.click?.());
-        }).catch(() => {});
-        await randomDelay(200, 300);
-        await inputEl.click({ timeout: 5000 });
+        // Extra pass to dismiss overlays right before focusing
+        try {
+          for (let i = 0; i < 2; i++) {
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await randomDelay(100, 150);
+          }
+
+          await this.page
+            .evaluate(() => {
+              const doc: any = (globalThis as any).document;
+              if (!doc) return;
+              doc
+                .querySelectorAll(
+                  '.cdk-overlay-backdrop, .cdk-overlay-container, .cdk-global-overlay-wrapper'
+                )
+                .forEach((el: any) => {
+                  try {
+                    el.remove();
+                  } catch {
+                    /* ignore */
+                  }
+                });
+            })
+            .catch(() => {});
+          await randomDelay(150, 250);
+        } catch {
+          /* ignore */
+        }
+        try {
+          await inputEl.click({ force: true, timeout: 5000 });
+        } catch {
+          try {
+            await this.page.click(inputSelector, { force: true, timeout: 5000 });
+          } catch {
+            await inputEl.click({ timeout: 5000 });
+          }
+        }
       } catch {
         try {
           await inputEl.click({ force: true, timeout: 5000 });
