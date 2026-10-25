@@ -15,11 +15,25 @@ import { fileURLToPath } from 'url';
 import { AuthManager } from './auth/auth-manager.js';
 import { SessionManager } from './session/session-manager.js';
 import { NotebookLibrary } from './library/notebook-library.js';
-import { ToolHandlers } from './tools/index.js';
+import { ToolHandlers, buildToolDefinitions } from './tools/index.js';
 import { AutoDiscovery } from './auto-discovery/auto-discovery.js';
 import { StartupManager } from './startup/startup-manager.js';
 import { isNotebookHost } from './utils/notebook-domain.js';
 import { log } from './utils/logger.js';
+
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ReadResourceRequestSchema,
+  isInitializeRequest,
+  type Tool,
+  type Resource,
+} from '@modelcontextprotocol/sdk/types.js';
+import { CANONICAL_TO_LEGACY } from './tools/tool-names.js';
 
 const SERVER_VERSION = (
   JSON.parse(
@@ -80,6 +94,519 @@ const authManager = new AuthManager();
 const sessionManager = new SessionManager(authManager);
 const library = new NotebookLibrary(sessionManager);
 const toolHandlers = new ToolHandlers(sessionManager, authManager, library);
+
+// MCP over Streamable HTTP (native /mcp endpoint for HTTP clients like Hermes)
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
+const mcpTransports = new Map<string, StreamableHTTPServerTransport>();
+
+function createMcpServer(): Server {
+  const server = new Server(
+    {
+      name: 'notebooklm-mcp',
+      version: SERVER_VERSION,
+    },
+    {
+      capabilities: {
+        tools: {},
+        resources: {},
+      },
+    }
+  );
+
+  const toolDefinitions = buildToolDefinitions(library) as Tool[];
+
+  // List available tools
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return {
+      tools: toolDefinitions,
+    };
+  });
+
+  // List available resources
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    const notebooks = library.listNotebooks();
+    const resources: Resource[] = [
+      {
+        uri: 'notebooklm://library',
+        name: 'Notebook Library',
+        description:
+          'Complete notebook library with all available knowledge sources. ' +
+          'Read this to discover what notebooks are available. ' +
+          "⚠️ If you think a notebook might help with the user's task, " +
+          'ASK THE USER FOR PERMISSION before consulting it: ' +
+          "'Should I consult the [notebook] for this task?'",
+        mimeType: 'application/json',
+      },
+    ];
+
+    for (const notebook of notebooks) {
+      resources.push({
+        uri: `notebooklm://library/${notebook.id}`,
+        name: notebook.name,
+        description:
+          `${notebook.description} | Topics: ${notebook.topics.join(', ')} | ` +
+          `💡 Use ask_question to query this notebook (ask user permission first if task isn't explicitly about these topics)`,
+        mimeType: 'application/json',
+      });
+    }
+
+    const active = library.getActiveNotebook();
+    if (active) {
+      resources.push({
+        uri: 'notebooklm://metadata',
+        name: 'Active Notebook Metadata (Legacy)',
+        description:
+          'Information about the currently active notebook. ' +
+          'DEPRECATED: Use notebooklm://library instead for multi-notebook support. ' +
+          "⚠️ Always ask user permission before using notebooks for tasks they didn't explicitly mention.",
+        mimeType: 'application/json',
+      });
+    }
+
+    return { resources };
+  });
+
+  // List resource templates
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+    return {
+      resourceTemplates: [
+        {
+          uriTemplate: 'notebooklm://library/{id}',
+          name: 'Notebook by ID',
+          description:
+            'Access a specific notebook from your library by ID. ' +
+            'Provides detailed metadata about the notebook including topics, use cases, and usage statistics. ' +
+            "💡 Use the 'id' parameter from list_notebooks to access specific notebooks.",
+          mimeType: 'application/json',
+        },
+      ],
+    };
+  });
+
+  // Read resource content
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    const { uri } = request.params;
+
+    if (uri === 'notebooklm://library') {
+      const notebooks = library.listNotebooks();
+      const stats = library.getStats();
+      const active = library.getActiveNotebook();
+
+      const libraryData = {
+        active_notebook: active
+          ? {
+              id: active.id,
+              name: active.name,
+              description: active.description,
+              topics: active.topics,
+            }
+          : null,
+        notebooks: notebooks.map((nb) => ({
+          id: nb.id,
+          name: nb.name,
+          description: nb.description,
+          topics: nb.topics,
+          content_types: nb.content_types,
+          use_cases: nb.use_cases,
+          url: nb.url,
+          use_count: nb.use_count,
+          last_used: nb.last_used,
+          tags: nb.tags,
+        })),
+        stats,
+      };
+
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(libraryData, null, 2),
+          },
+        ],
+      };
+    }
+
+    if (uri.startsWith('notebooklm://library/')) {
+      const prefix = 'notebooklm://library/';
+      const encodedId = uri.slice(prefix.length);
+      if (!encodedId) {
+        throw new Error('Notebook resource requires an ID (e.g. notebooklm://library/{id})');
+      }
+
+      let id: string;
+      try {
+        id = decodeURIComponent(encodedId);
+      } catch {
+        throw new Error(`Invalid notebook identifier encoding: ${encodedId}`);
+      }
+
+      if (!/^[a-z0-9][a-z0-9-]{0,62}$/i.test(id)) {
+        throw new Error(
+          `Invalid notebook identifier: ${encodedId}. Notebook IDs may only contain letters, numbers, and hyphens.`
+        );
+      }
+
+      const notebook = library.getNotebook(id);
+
+      if (!notebook) {
+        throw new Error(`Notebook not found: ${id}`);
+      }
+
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(notebook, null, 2),
+          },
+        ],
+      };
+    }
+
+    if (uri === 'notebooklm://metadata') {
+      const active = library.getActiveNotebook();
+
+      if (!active) {
+        throw new Error('No active notebook. Use notebooklm://library to see all notebooks.');
+      }
+
+      const metadata = {
+        description: active.description,
+        topics: active.topics,
+        content_types: active.content_types,
+        use_cases: active.use_cases,
+        notebook_url: active.url,
+        notebook_id: active.id,
+        last_used: active.last_used,
+        use_count: active.use_count,
+        note: 'DEPRECATED: Use notebooklm://library or notebooklm://library/{id} instead',
+      };
+
+      return {
+        contents: [
+          {
+            uri,
+            mimeType: 'application/json',
+            text: JSON.stringify(metadata, null, 2),
+          },
+        ],
+      };
+    }
+
+    throw new Error(`Unknown resource: ${uri}`);
+  });
+
+  // Handle tool calls
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name: requestedName, arguments: args } = request.params;
+    const name = CANONICAL_TO_LEGACY[requestedName] ?? requestedName;
+    const progressToken = (args as Record<string, unknown> | undefined)?._meta as
+      | { progressToken?: string }
+      | undefined;
+    const token = progressToken?.progressToken;
+
+    const sendProgress = async (message: string, progress?: number, total?: number) => {
+      if (token) {
+        try {
+          await server.notification({
+            method: 'notifications/progress',
+            params: {
+              progressToken: token,
+              message,
+              ...(progress !== undefined && { progress }),
+              ...(total !== undefined && { total }),
+            },
+          });
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    try {
+      let result: any;
+
+      switch (name) {
+        case 'ask_question':
+          result = await toolHandlers.handleAskQuestion(
+            args as {
+              question: string;
+              session_id?: string;
+              notebook_id?: string;
+              notebook_url?: string;
+              show_browser?: boolean;
+            },
+            sendProgress
+          );
+          break;
+
+        case 'batch_to_vault':
+          try {
+            // @ts-expect-error
+            result = await (toolHandlers as any).handleBatchToVault(args as any, sendProgress);
+          } catch {
+            // @ts-expect-error
+            result = await (toolHandlers as any).handleBatchToVault?.(args as any);
+          }
+          break;
+
+        case 'add_notebook':
+          result = await toolHandlers.handleAddNotebook(args as any);
+          break;
+
+        case 'list_notebooks':
+          result = await toolHandlers.handleListNotebooks();
+          break;
+
+        case 'get_notebook':
+          result = await toolHandlers.handleGetNotebook(args as any);
+          break;
+
+        case 'select_notebook':
+          result = await toolHandlers.handleSelectNotebook(args as any);
+          break;
+
+        case 'remove_notebook':
+          result = await toolHandlers.handleRemoveNotebook(args as any);
+          break;
+
+        case 'update_notebook':
+          result = await toolHandlers.handleUpdateNotebook(args as any);
+          break;
+
+        case 'get_library_stats':
+          result = await toolHandlers.handleGetLibraryStats();
+          break;
+
+        case 'search_notebooks':
+          result = await toolHandlers.handleSearchNotebooks(args as any);
+          break;
+
+        case 'auto_discover_notebook':
+          result = await toolHandlers.handleAutoDiscoverNotebook(args as any);
+          break;
+
+        case 'setup_auth':
+          result = await toolHandlers.handleSetupAuth(args as any);
+          break;
+
+        case 'list_sessions':
+          result = await toolHandlers.handleListSessions();
+          break;
+
+        case 'close_session':
+          result = await toolHandlers.handleCloseSession(args as any);
+          break;
+
+        case 'reset_session':
+          result = await toolHandlers.handleResetSession(args as any);
+          break;
+
+        case 'get_health':
+          result = await toolHandlers.handleGetHealth();
+          break;
+
+        case 'add_source':
+          result = await toolHandlers.handleAddSource(args as any);
+          break;
+
+        case 'rename_source':
+        case 'remove_source':
+          result = await toolHandlers.handleRenameSource(args as any);
+          break;
+
+        case 'generate_content':
+          try {
+            // @ts-expect-error
+            result = await (toolHandlers as any).handleGenerateContent(args as any, sendProgress);
+          } catch {
+            try {
+              // @ts-expect-error
+              result = await (toolHandlers as any).handleGenerateContent(args as any);
+            } catch {
+              // @ts-expect-error
+              result = await (toolHandlers as any).handleGenerateContent(args as any);
+            }
+          }
+          break;
+
+        case 'download_content':
+          result = await toolHandlers.handleDownloadContent(args as any);
+          break;
+
+        case 'create_note':
+          result = await toolHandlers.handleCreateNote(args as any);
+          break;
+
+        case 'chat_to_note':
+        case 'save_chat_to_note':
+          result = await toolHandlers.handleSaveChatToNote(args as any);
+          break;
+
+        case 'note_to_source':
+        case 'convert_note_to_source':
+          result = await toolHandlers.handleConvertNoteToSource(args as any);
+          break;
+
+        case 'list_sources':
+          try {
+            result = await toolHandlers.handleListSources((args || {}) as any);
+          } catch {
+            // @ts-expect-error
+            result = await (toolHandlers as any).handleListSources?.((args || {}) as any);
+          }
+          break;
+
+        case 'read_source':
+          try {
+            result = await toolHandlers.handleReadSource(args as any);
+          } catch {
+            // @ts-expect-error
+            result = await (toolHandlers as any).handleReadSource?.(args as any);
+          }
+          break;
+
+        case 'scrape_notebook':
+          try {
+            // @ts-expect-error
+            result = await (toolHandlers as any).handleScrapeNotebook?.(args as any);
+          } catch {
+            result = await (toolHandlers as any).handleCreateNotebook?.(args as any);
+          }
+          if (!result) {
+            throw new Error('Scrape notebook not available in this build');
+          }
+          break;
+
+        case 're_authenticate':
+        case 're_auth':
+          // @ts-expect-error -- optional handler
+
+          result = await (toolHandlers as any).handleReAuth?.(args as any);
+          if (!result) throw new Error('Re-auth not available');
+          break;
+
+        case 'de_authenticate':
+        case 'de_auth':
+          // @ts-expect-error -- optional handler
+
+          result = await (toolHandlers as any).handleDeAuth?.();
+          if (!result) throw new Error('De-auth not available');
+          break;
+
+        case 'cleanup_data':
+          result = await toolHandlers.handleCleanupData(args as any);
+          break;
+
+        default:
+          throw new Error(`Unknown tool: ${requestedName}`);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ success: false, error: message }, null, 2),
+          },
+        ],
+        isError: true,
+      };
+    }
+  });
+
+  return server;
+}
+
+// Streamable HTTP MCP endpoint
+app.all('/mcp', async (req: Request, res: Response) => {
+  try {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+    if (req.method === 'POST') {
+      if (sessionId && mcpTransports.has(sessionId)) {
+        const transport = mcpTransports.get(sessionId)!;
+        await transport.handleRequest(req, res, req.body);
+        return;
+      }
+
+      if (!sessionId && isInitializeRequest(req.body)) {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (id) => {
+            mcpTransports.set(id, transport);
+          },
+        });
+
+        transport.onclose = () => {
+          const sid = transport.sessionId;
+          if (sid) {
+            mcpTransports.delete(sid);
+          }
+        };
+
+        const server = createMcpServer();
+        await server.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+        return;
+      }
+
+      res.status(400).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Bad Request: No valid session ID provided',
+        },
+        id: null,
+      });
+      return;
+    }
+
+    if (req.method === 'GET') {
+      if (!sessionId || !mcpTransports.has(sessionId)) {
+        res.status(400).send('Invalid or missing session ID');
+        return;
+      }
+      const transport = mcpTransports.get(sessionId)!;
+      await transport.handleRequest(req, res);
+      return;
+    }
+
+    if (req.method === 'DELETE') {
+      if (!sessionId || !mcpTransports.has(sessionId)) {
+        res.status(400).send('Invalid or missing session ID');
+        return;
+      }
+      const transport = mcpTransports.get(sessionId)!;
+      await transport.handleRequest(req, res);
+      return;
+    }
+
+    res.status(405).set('Allow', 'GET, POST, DELETE').send('Method Not Allowed');
+  } catch (error) {
+    log.error(`MCP HTTP error: ${error instanceof Error ? error.message : String(error)}`);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: 'Internal server error',
+        },
+        id: null,
+      });
+    }
+  }
+});
 
 // Root endpoint - API info
 app.get('/', (_req: Request, res: Response) => {
