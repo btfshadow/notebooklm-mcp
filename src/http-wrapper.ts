@@ -96,7 +96,7 @@ const library = new NotebookLibrary(sessionManager);
 const toolHandlers = new ToolHandlers(sessionManager, authManager, library);
 
 // MCP over Streamable HTTP (native /mcp endpoint for HTTP clients like Hermes)
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/ban-ts-comment */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const mcpTransports = new Map<string, StreamableHTTPServerTransport>();
 
 function createMcpServer(): Server {
@@ -343,10 +343,8 @@ function createMcpServer(): Server {
 
         case 'batch_to_vault':
           try {
-            // @ts-expect-error
             result = await (toolHandlers as any).handleBatchToVault(args as any, sendProgress);
           } catch {
-            // @ts-expect-error
             result = await (toolHandlers as any).handleBatchToVault?.(args as any);
           }
           break;
@@ -418,14 +416,11 @@ function createMcpServer(): Server {
 
         case 'generate_content':
           try {
-            // @ts-expect-error
             result = await (toolHandlers as any).handleGenerateContent(args as any, sendProgress);
           } catch {
             try {
-              // @ts-expect-error
               result = await (toolHandlers as any).handleGenerateContent(args as any);
             } catch {
-              // @ts-expect-error
               result = await (toolHandlers as any).handleGenerateContent(args as any);
             }
           }
@@ -453,7 +448,6 @@ function createMcpServer(): Server {
           try {
             result = await toolHandlers.handleListSources((args || {}) as any);
           } catch {
-            // @ts-expect-error
             result = await (toolHandlers as any).handleListSources?.((args || {}) as any);
           }
           break;
@@ -462,14 +456,12 @@ function createMcpServer(): Server {
           try {
             result = await toolHandlers.handleReadSource(args as any);
           } catch {
-            // @ts-expect-error
             result = await (toolHandlers as any).handleReadSource?.(args as any);
           }
           break;
 
         case 'scrape_notebook':
           try {
-            // @ts-expect-error
             result = await (toolHandlers as any).handleScrapeNotebook?.(args as any);
           } catch {
             result = await (toolHandlers as any).handleCreateNotebook?.(args as any);
@@ -481,16 +473,12 @@ function createMcpServer(): Server {
 
         case 're_authenticate':
         case 're_auth':
-          // @ts-expect-error -- optional handler
-
           result = await (toolHandlers as any).handleReAuth?.(args as any);
           if (!result) throw new Error('Re-auth not available');
           break;
 
         case 'de_authenticate':
         case 'de_auth':
-          // @ts-expect-error -- optional handler
-
           result = await (toolHandlers as any).handleDeAuth?.();
           if (!result) throw new Error('De-auth not available');
           break;
