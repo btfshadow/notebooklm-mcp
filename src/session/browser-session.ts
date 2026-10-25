@@ -223,6 +223,15 @@ export class BrowserSession {
       throw new Error('Page not initialized');
     }
 
+    const currentUrl = this.page.url();
+    if (!currentUrl.includes('/notebook/')) {
+      throw new Error(
+        `Expected to be inside a notebook (URL must contain /notebook/). Current URL: ${currentUrl}\n\n` +
+          `Provide notebook_url or notebook_id, or set an active notebook in the library.\n` +
+          `Example: { "question": "...", "notebook_url": "https://notebooklm.google.com/notebook/..." }`
+      );
+    }
+
     try {
       // Dismiss overlays that appear on empty/new notebooks
       await this.dismissTransientUi();
@@ -237,10 +246,21 @@ export class BrowserSession {
       } catch {
         // Try after dismissing again (empty notebook can show upload dialog)
         await this.dismissTransientUi();
-        await this.page.waitForSelector('textarea.query-box-input', {
-          timeout: 10000,
-          state: 'visible',
-        });
+        try {
+          await this.page.waitForSelector('textarea.query-box-input', {
+            timeout: 10000,
+            state: 'visible',
+          });
+        } catch {
+          // Last resort: try any textarea that looks like query input
+          await this.page.waitForSelector(
+            'textarea[aria-label*="query" i], textarea[placeholder*="question" i], textarea[placeholder*="Ask" i]',
+            {
+              timeout: 8000,
+              state: 'visible',
+            }
+          );
+        }
       }
       log.success('  ✅ Chat input ready!');
 
