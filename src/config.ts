@@ -85,7 +85,7 @@ export interface Config {
    * about *reading* NotebookLM's UI — it must never decide what language a
    * generated artifact comes out in; that is `contentLanguage` (issue #34).
    */
-  uiLocale: 'fr' | 'en' | 'de' | 'ja';
+  uiLocale: 'fr' | 'en' | 'de' | 'ja' | 'pt_BR';
 
   /**
    * Default output language for generated content, as a BCP-47 code.
@@ -110,6 +110,7 @@ export const LOCALE_BROWSER_SETTINGS: Record<
   en: { locale: 'en-US', timezone: 'America/New_York' },
   de: { locale: 'de-DE', timezone: 'Europe/Berlin' },
   ja: { locale: 'ja-JP', timezone: 'Asia/Tokyo' },
+  pt_BR: { locale: 'pt-BR', timezone: 'America/Sao_Paulo' },
 };
 
 /**
@@ -235,14 +236,17 @@ function parseLocale(
   if (!value) return defaultValue;
   const lower = value.toLowerCase();
   if (lower === 'fr' || lower === 'en' || lower === 'de' || lower === 'ja') {
-    return lower;
+    return lower as Config['uiLocale'];
+  }
+  if (lower === 'pt_br' || lower === 'pt-br' || lower === 'pt') {
+    return 'pt_BR';
   }
   // Say so. Discarding this in silence cost a user a long debugging session
   // (issue #34): they set NOTEBOOKLM_UI_LOCALE=es, got 'fr' back with no word
   // about it, and had no way to tell the setting had been ignored.
   console.error(
     `[notebooklm-mcp] NOTEBOOKLM_UI_LOCALE="${value}" is not a supported interface ` +
-      `language (fr, en, de, ja) — falling back to "${defaultValue}". ` +
+      `language (fr, en, de, ja, pt_BR) — falling back to "${defaultValue}". ` +
       `This only affects the language NotebookLM's UI is driven in; to choose the ` +
       `language of generated content use the tool's "language" argument or ` +
       `NOTEBOOKLM_CONTENT_LANGUAGE.`
