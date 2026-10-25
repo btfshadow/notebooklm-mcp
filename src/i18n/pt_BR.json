@@ -1,0 +1,123 @@
+{
+  "$schema": "./locale-schema.json",
+  "locale": "pt_BR",
+  "name": "Português (Brasil)",
+  "description": "Português (Brasil) UI selectors for NotebookLM",
+  "tabs": {
+    "sources": "Fontes",
+    "discussion": "Discussão",
+    "studio": "Estúdio"
+  },
+  "buttons": {
+    "addSource": "Adicionar fonte",
+    "addNote": "Adicionar nota",
+    "newNote": "Nova nota",
+    "insert": "Inserir",
+    "add": "Adicionar",
+    "upload": "Enviar",
+    "delete": "Excluir",
+    "remove": "Remover",
+    "confirm": "Confirmar",
+    "yes": "Sim",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "save": "Salvar",
+    "done": "Concluído",
+    "create": "Criar",
+    "download": "Baixar",
+    "generate": "Gerar"
+  },
+  "sourceTypes": {
+    "uploadFiles": "Enviar arquivos",
+    "website": "Site",
+    "link": "Link",
+    "url": "URL",
+    "pastedText": "Texto colado",
+    "drive": "Google Drive",
+    "youtube": "YouTube"
+  },
+  "placeholders": {
+    "pasteUrl": "Colar",
+    "enterUrl": "Inserir",
+    "pasteLinks": "link"
+  },
+  "sourceNames": {
+    "pastedText": "Texto colado"
+  },
+  "contentTypes": {
+    "audio": "Áudio",
+    "video": "Vídeo",
+    "presentation": "Apresentação",
+    "slides": "Slides",
+    "infographic": "Infográfico",
+    "report": "Relatório",
+    "briefing": "Resumo",
+    "dataTable": "Tabela de dados",
+    "table": "Tabela"
+  },
+  "contentOptions": {
+    "videoStyles": {
+      "classroom": "Sala de aula",
+      "documentary": "Documentário",
+      "animated": "Animado",
+      "corporate": "Corporativo",
+      "cinematic": "Cinematográfico",
+      "minimalist": "Minimalista"
+    },
+    "videoFormats": {
+      "brief": "Curto",
+      "explainer": "Explicativo"
+    },
+    "presentationStyles": {
+      "detailedSlideshow": "Apresentação detalhada",
+      "presenterNotes": "Notas do apresentador"
+    },
+    "presentationLengths": {
+      "short": "Short",
+      "default": "Default"
+    },
+    "infographicFormats": {
+      "horizontal": "Horizontal",
+      "vertical": "Vertical"
+    },
+    "reportFormats": {
+      "summary": "Summary",
+      "detailed": "Detailed"
+    }
+  },
+  "dialogs": {
+    "selectLanguage": "Select language",
+    "language": "Language"
+  },
+  "actions": {
+    "openInSheets": "Open in Sheets",
+    "openInSlides": "Open in Slides",
+    "deepDive": "Deep Dive",
+    "audioOverview": "Audio Overview",
+    "addToSources": "Add to sources",
+    "convertToSource": "Convert to source"
+  },
+  "status": {
+    "generating": "Generating...",
+    "processing": "Processing...",
+    "ready": "Ready"
+  },
+  "errors": {
+    "error": "Error",
+    "rateLimitReached": "You have reached the daily limit"
+  },
+  "notebookActions": {
+    "menu": "Mais ações",
+    "share": "Compartilhar",
+    "delete": "Excluir"
+  },
+  "chat": {
+    "placeholder": "Digite sua pergunta...",
+    "send": "Enviar"
+  },
+  "auth": {
+    "signIn": "Fazer login",
+    "signOut": "Sair",
+    "account": "Conta"
+  }
+}
