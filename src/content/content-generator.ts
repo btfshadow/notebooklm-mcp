@@ -714,11 +714,30 @@ export class ContentGenerator {
   private async sendChatMessage(message: string): Promise<void> {
     log.info(`  Sending chat message: "${message.substring(0, 50)}..."`);
 
+    // Dismiss any overlays
+    try {
+      await this.page.keyboard.press('Escape').catch(() => {});
+      await randomDelay(200, 300);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await this.page.evaluate(() => {
+        const doc: any = (globalThis as any).document;
+        if (!doc) return;
+        doc.querySelectorAll('.cdk-overlay-backdrop').forEach((b: any) => b.click?.());
+        doc.querySelectorAll('button[aria-label="Close"], button[aria-label="Fechar"], button[aria-label="Cerrar"]').forEach((b: any) => b.click?.());
+      }).catch(() => {});
+      await randomDelay(200, 300);
+    } catch {}
+
     // Find the chat input (same approach as BrowserSession.findChatInput)
     const chatInputSelectors = [
       'textarea.query-box-input', // PRIMARY - same as Python implementation
       'textarea[aria-label*="query"]',
       'textarea[aria-label*="Zone de requete"]',
+      'textarea[aria-label*="Feld für"]',
+      'textarea[aria-label*="Caja"]',
+      'textarea[aria-label*="Perguntar"]',
+      'textarea[placeholder*="Ask"]',
+      'textarea[placeholder*="question"]',
     ];
 
     let inputSelector: string | null = null;
@@ -745,7 +764,27 @@ export class ContentGenerator {
     // Clear any existing text first
     const inputEl = await this.page.$(inputSelector);
     if (inputEl) {
-      await inputEl.click();
+      try {
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await randomDelay(200, 300);
+        // Try to remove any overlay
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await this.page.evaluate(() => {
+          const doc: any = (globalThis as any).document;
+          if (!doc) return;
+          const overlays = doc.querySelectorAll('.cdk-overlay-backdrop, .cdk-overlay-container .mat-mdc-dialog-container, .mat-dialog-container');
+          overlays.forEach((o: any) => o.click?.());
+        }).catch(() => {});
+        await randomDelay(200, 300);
+        await inputEl.click({ timeout: 5000 });
+      } catch {
+        try {
+          await inputEl.click({ force: true, timeout: 5000 });
+        } catch {
+          // last resort
+          await this.page.click(inputSelector, { force: true, timeout: 5000 });
+        }
+      }
       await this.page.keyboard.press('Control+A');
       await this.page.keyboard.press('Backspace');
       await randomDelay(200, 400);
