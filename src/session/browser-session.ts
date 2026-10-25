@@ -224,12 +224,24 @@ export class BrowserSession {
     }
 
     try {
+      // Dismiss overlays that appear on empty/new notebooks
+      await this.dismissTransientUi();
+
       // PRIMARY: Wait for chat input
       log.info('  ⏳ Waiting for chat input (textarea.query-box-input)...');
-      await this.page.waitForSelector('textarea.query-box-input', {
-        timeout: 15000,
-        state: 'visible',
-      });
+      try {
+        await this.page.waitForSelector('textarea.query-box-input', {
+          timeout: 15000,
+          state: 'visible',
+        });
+      } catch {
+        // Try after dismissing again (empty notebook can show upload dialog)
+        await this.dismissTransientUi();
+        await this.page.waitForSelector('textarea.query-box-input', {
+          timeout: 10000,
+          state: 'visible',
+        });
+      }
       log.success('  ✅ Chat input ready!');
 
       // CRITICAL: Wait for page content to load (no skeleton UI)
@@ -871,16 +883,33 @@ export class BrowserSession {
             '.cdk-global-overlay-wrapper',
             '.mat-mdc-dialog-container',
             '.mat-dialog-container',
+            '[role="dialog"]',
           ];
           for (const sel of selectors) {
             doc.querySelectorAll(sel).forEach((el: any) => {
               try {
-                el.remove();
+                const closeBtns = el.querySelectorAll(
+                  'button[aria-label*="Close"], button[aria-label*="Fechar"], button[aria-label*="Dismiss"], [mat-dialog-close], .mat-mdc-dialog-close'
+                );
+                closeBtns.forEach((b: any) => {
+                  try {
+                    b.click();
+                  } catch {
+                    /* ignore */
+                  }
+                });
               } catch {
                 /* ignore */
               }
             });
           }
+          doc.querySelectorAll('.cdk-overlay-backdrop').forEach((el: any) => {
+            try {
+              el.remove();
+            } catch {
+              /* ignore */
+            }
+          });
         })
         .catch(() => {});
 
